@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::board::Board;
+use crate::domain::column::Column;
 use crate::domain::project::Project;
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -75,5 +76,39 @@ pub struct CreateBoardRequest {
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateBoardRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnResponse {
+    pub id: Uuid,
+    pub board_id: Uuid,
+    pub name: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<Column> for ColumnResponse {
+    fn from(column: Column) -> Self {
+        Self {
+            id: column.id.as_uuid(),
+            board_id: column.board_id.as_uuid(),
+            name: column.name.into_string(),
+            position: column.position.value(),
+            created_at: column.created_at,
+            updated_at: column.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateColumnRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateColumnRequest {
     pub name: String,
 }

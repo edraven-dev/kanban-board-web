@@ -1,4 +1,5 @@
 pub mod boards;
+pub mod columns;
 pub mod dto;
 pub mod error;
 pub mod projects;
