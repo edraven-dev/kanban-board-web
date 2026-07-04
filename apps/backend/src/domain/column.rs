@@ -13,3 +13,17 @@ pub struct Column {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+impl Column {
+    pub fn new(board_id: BoardId, name: EntityName, position: Position) -> Self {
+        let now = Utc::now();
+        Self {
+            id: ColumnId::new(),
+            board_id,
+            name,
+            position,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}

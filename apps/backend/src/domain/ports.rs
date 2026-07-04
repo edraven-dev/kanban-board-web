@@ -59,11 +59,10 @@ pub trait BoardRepository: Send + Sync {
 pub trait ColumnRepository: Send + Sync {
     async fn list_by_board(&self, board_id: BoardId) -> RepoResult<Vec<Column>>;
     async fn get(&self, id: ColumnId) -> RepoResult<Option<Column>>;
-    async fn insert(&self, column: &Column) -> RepoResult<()>;
+    async fn insert_within_limit(&self, column: &Column, max: i64) -> RepoResult<LimitedInsert>;
     async fn update(&self, id: ColumnId, name: EntityName) -> RepoResult<()>;
     async fn delete(&self, id: ColumnId) -> RepoResult<()>;
     async fn reorder(&self, board_id: BoardId, ordered_ids: &[ColumnId]) -> RepoResult<()>;
-    async fn count_by_parent(&self, board_id: BoardId) -> RepoResult<i64>;
 }
 
 #[async_trait]
