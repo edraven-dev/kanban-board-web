@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "m09-domain": {
+      "source": "zhanghandong/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/m09-domain/SKILL.md",
+      "computedHash": "ce0ed9b5b5c12775c6c04423c79c8a542638629237ad2447a3c6569accf1a15a"
+    }
+  }
+}

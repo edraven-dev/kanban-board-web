@@ -13,12 +13,18 @@ fn get(uri: &str, origin: Option<&str>) -> Request<Body> {
 }
 
 #[tokio::test]
-async fn health_is_served_under_the_api_prefix() {
+async fn health_returns_ok_json_under_the_api_prefix() {
     let res = router(AppEnv::Development)
         .oneshot(get("/api/health", None))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["status"], "ok");
 }
 
 #[tokio::test]

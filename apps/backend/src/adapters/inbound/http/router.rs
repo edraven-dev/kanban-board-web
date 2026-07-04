@@ -1,6 +1,8 @@
+use axum::Json;
 use axum::Router;
+use serde::Serialize;
 use tower_http::cors::CorsLayer;
-use utoipa::OpenApi;
+use utoipa::{OpenApi, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use utoipa_swagger_ui::SwaggerUi;
@@ -25,7 +27,12 @@ pub fn router(app_env: AppEnv) -> Router {
     router
 }
 
-#[utoipa::path(get, path = "/health", responses((status = 200, description = "Service is healthy", body = str)))]
-async fn health() -> &'static str {
-    "ok"
+#[derive(Serialize, ToSchema)]
+struct Health {
+    status: &'static str,
+}
+
+#[utoipa::path(get, path = "/health", responses((status = 200, body = Health)))]
+async fn health() -> Json<Health> {
+    Json(Health { status: "ok" })
 }
