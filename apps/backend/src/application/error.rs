@@ -11,6 +11,8 @@ pub enum ApplicationError {
     NotFound,
     #[error("limit exceeded")]
     LimitExceeded,
+    #[error("{0}")]
+    Unprocessable(String),
     #[error(transparent)]
     Repository(#[from] RepositoryError),
 }

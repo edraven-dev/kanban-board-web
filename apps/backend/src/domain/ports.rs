@@ -33,7 +33,7 @@ pub trait ProjectRepository: Send + Sync {
     async fn list(&self) -> RepoResult<Vec<Project>>;
     async fn get(&self, id: ProjectId) -> RepoResult<Option<Project>>;
     async fn insert(&self, project: &Project) -> RepoResult<()>;
-    async fn rename(&self, id: ProjectId, name: EntityName) -> RepoResult<()>;
+    async fn update(&self, id: ProjectId, name: EntityName) -> RepoResult<()>;
     async fn delete(&self, id: ProjectId) -> RepoResult<()>;
     async fn reorder(&self, ordered_ids: &[ProjectId]) -> RepoResult<()>;
 }
@@ -43,7 +43,7 @@ pub trait BoardRepository: Send + Sync {
     async fn list_by_project(&self, project_id: ProjectId) -> RepoResult<Vec<Board>>;
     async fn get(&self, id: BoardId) -> RepoResult<Option<Board>>;
     async fn insert(&self, board: &Board) -> RepoResult<()>;
-    async fn rename(&self, id: BoardId, name: EntityName) -> RepoResult<()>;
+    async fn update(&self, id: BoardId, name: EntityName) -> RepoResult<()>;
     async fn delete(&self, id: BoardId) -> RepoResult<()>;
     async fn reorder(&self, project_id: ProjectId, ordered_ids: &[BoardId]) -> RepoResult<()>;
     async fn count_by_parent(&self, project_id: ProjectId) -> RepoResult<i64>;
@@ -54,7 +54,7 @@ pub trait ColumnRepository: Send + Sync {
     async fn list_by_board(&self, board_id: BoardId) -> RepoResult<Vec<Column>>;
     async fn get(&self, id: ColumnId) -> RepoResult<Option<Column>>;
     async fn insert(&self, column: &Column) -> RepoResult<()>;
-    async fn rename(&self, id: ColumnId, name: EntityName) -> RepoResult<()>;
+    async fn update(&self, id: ColumnId, name: EntityName) -> RepoResult<()>;
     async fn delete(&self, id: ColumnId) -> RepoResult<()>;
     async fn reorder(&self, board_id: BoardId, ordered_ids: &[ColumnId]) -> RepoResult<()>;
     async fn count_by_parent(&self, board_id: BoardId) -> RepoResult<i64>;

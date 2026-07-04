@@ -10,6 +10,7 @@ fn status_and_code(error: &ApplicationError) -> (StatusCode, &'static str) {
         ApplicationError::Domain(_) => (StatusCode::BAD_REQUEST, "validation"),
         ApplicationError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
         ApplicationError::LimitExceeded => (StatusCode::CONFLICT, "limit_exceeded"),
+        ApplicationError::Unprocessable(_) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable"),
         ApplicationError::Repository(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
     }
 }
@@ -42,6 +43,11 @@ mod tests {
                 ApplicationError::LimitExceeded,
                 StatusCode::CONFLICT,
                 "limit_exceeded",
+            ),
+            (
+                ApplicationError::Unprocessable("bad".into()),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "unprocessable",
             ),
             (
                 ApplicationError::Repository(RepositoryError::new("boom")),
