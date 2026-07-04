@@ -1,0 +1,115 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@7.2.1
+  rust: circleci/rust@2.0.0
+
+executors:
+  # Machine executor because the backend's integration tests use testcontainers,
+  # which needs a real local Docker daemon (remote-docker can't map the container's
+  # port to localhost). The same executor also builds the frontend and Rust crate.
+  turbo:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+
+commands:
+  setup:
+    steps:
+      - checkout
+      # Node version comes from .nvmrc; pnpm version from package.json's packageManager.
+      - node/install:
+          install-pnpm: true
+          pnpm-version: 11.3.0
+      - node/install-packages:
+          pkg-manager: pnpm
+      - rust/install
+      - run:
+          name: Ensure clippy is installed
+          command: rustup component add clippy
+      - restore_cache:
+          keys:
+            - cargo-v1-{{ checksum "apps/backend/Cargo.lock" }}
+            - cargo-v1-
+
+  # Turborepo's own local cache. Restoring it between runs lets turbo replay
+  # unchanged tasks (a cache hit skips execution entirely). Keyed per job + branch
+  # with a rolling revision suffix so each run writes a fresh entry.
+  restore_turbo_cache:
+    steps:
+      - restore_cache:
+          keys:
+            - turbo-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-
+            - turbo-{{ .Environment.CIRCLE_JOB }}-
+  save_turbo_cache:
+    steps:
+      - save_cache:
+          key: turbo-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - .turbo/cache
+
+jobs:
+  build:
+    executor: turbo
+    steps:
+      - setup
+      - restore_turbo_cache
+      - run:
+          name: Build (turbo)
+          command: pnpm run build
+      - save_turbo_cache
+      - save_cache:
+          key: cargo-v1-{{ checksum "apps/backend/Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+
+  lint:
+    executor: turbo
+    steps:
+      - setup
+      - restore_turbo_cache
+      - run:
+          name: Lint (turbo)
+          command: pnpm run lint
+      - save_turbo_cache
+
+  check-types:
+    executor: turbo
+    steps:
+      - setup
+      - restore_turbo_cache
+      - run:
+          name: Check types (turbo)
+          command: pnpm run check-types
+      - save_turbo_cache
+
+  # Coverage runs the backend suite under instrumentation, enforces the ≥90% gate,
+  # and publishes the HTML report. It intentionally does NOT use the turbo cache: a
+  # cache hit would skip the test run and leave no coverage data for the report.
+  coverage:
+    executor: turbo
+    steps:
+      - setup
+      - run:
+          name: Install cargo-llvm-cov
+          command: |
+            rustup component add llvm-tools-preview
+            curl --proto '=https' --tlsv1.2 -fsSL https://github.com/taiki-e/cargo-llvm-cov/releases/latest/download/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C "$HOME/.cargo/bin"
+      - run:
+          name: Test + coverage gate (turbo)
+          command: pnpm run test:coverage
+      - run:
+          name: Generate HTML coverage report
+          command: cd apps/backend && cargo llvm-cov report --ignore-filename-regex 'src/main\.rs' --html
+      - store_artifacts:
+          path: apps/backend/target/llvm-cov/html
+          destination: coverage
+
+workflows:
+  ci:
+    jobs:
+      - build
+      - lint
+      - check-types
+      - coverage
