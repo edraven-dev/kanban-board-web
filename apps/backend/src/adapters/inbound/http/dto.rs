@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::domain::board::Board;
 use crate::domain::project::Project;
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -41,4 +42,38 @@ pub struct UpdateProjectRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ReorderRequest {
     pub ordered_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BoardResponse {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub name: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<Board> for BoardResponse {
+    fn from(board: Board) -> Self {
+        Self {
+            id: board.id.as_uuid(),
+            project_id: board.project_id.as_uuid(),
+            name: board.name.into_string(),
+            position: board.position.value(),
+            created_at: board.created_at,
+            updated_at: board.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateBoardRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateBoardRequest {
+    pub name: String,
 }

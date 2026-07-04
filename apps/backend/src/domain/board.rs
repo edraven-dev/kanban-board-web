@@ -13,3 +13,17 @@ pub struct Board {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+impl Board {
+    pub fn new(project_id: ProjectId, name: EntityName, position: Position) -> Self {
+        let now = Utc::now();
+        Self {
+            id: BoardId::new(),
+            project_id,
+            name,
+            position,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}

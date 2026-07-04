@@ -7,7 +7,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::adapters::inbound::http::projects;
+use crate::adapters::inbound::http::{boards, projects};
 use crate::app_state::AppState;
 use crate::infrastructure::config::AppEnv;
 
@@ -37,6 +37,9 @@ fn api_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::list, projects::create))
         .routes(routes!(projects::reorder))
         .routes(routes!(projects::update, projects::delete))
+        .routes(routes!(boards::list, boards::create))
+        .routes(routes!(boards::reorder))
+        .routes(routes!(boards::update, boards::delete))
 }
 
 #[derive(Serialize, ToSchema)]

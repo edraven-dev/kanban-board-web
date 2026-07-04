@@ -1,7 +1,7 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::application::error::ApplicationError;
+use crate::application::reorder::ensure_permutation;
 use crate::domain::ids::ProjectId;
 use crate::domain::name::EntityName;
 use crate::domain::ports::ProjectRepository;
@@ -52,14 +52,9 @@ impl ProjectService {
     }
 
     pub async fn reorder(&self, ordered_ids: Vec<ProjectId>) -> Result<(), ApplicationError> {
-        let existing: HashSet<ProjectId> =
+        let existing: Vec<ProjectId> =
             self.projects.list().await?.into_iter().map(|p| p.id).collect();
-        let provided: HashSet<ProjectId> = ordered_ids.iter().copied().collect();
-        if provided.len() != ordered_ids.len() || provided != existing {
-            return Err(ApplicationError::Unprocessable(
-                "orderedIds must be a permutation of the current project ids".to_owned(),
-            ));
-        }
+        ensure_permutation(&existing, &ordered_ids)?;
         self.projects.reorder(&ordered_ids).await?;
         Ok(())
     }

@@ -1,3 +1,4 @@
+pub mod boards;
 pub mod dto;
 pub mod error;
 pub mod projects;
