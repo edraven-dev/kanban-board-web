@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::{
-    BoardResponse, CreateBoardRequest, ReorderRequest, UpdateBoardRequest,
+    BoardFullResponse, BoardResponse, CreateBoardRequest, ReorderRequest, UpdateBoardRequest,
 };
 use crate::app_state::AppState;
 use crate::application::error::ApplicationError;
@@ -42,6 +42,23 @@ pub async fn create(
         .create(ProjectId::from_uuid(project_id), &body.name)
         .await?;
     Ok((StatusCode::CREATED, Json(board.into())))
+}
+
+#[utoipa::path(
+    get, path = "/boards/{id}/full", tag = "boards",
+    params(("id" = Uuid, Path, description = "Board id")),
+    responses((status = 200, body = BoardFullResponse), (status = 404))
+)]
+pub async fn full(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BoardFullResponse>, ApplicationError> {
+    let view = state
+        .board_view
+        .get_full(BoardId::from_uuid(id))
+        .await?
+        .ok_or(ApplicationError::NotFound)?;
+    Ok(Json(view.into()))
 }
 
 #[utoipa::path(

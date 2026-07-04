@@ -150,6 +150,27 @@ mod tests {
                 .collect())
         }
 
+        async fn list_by_columns(&self, column_ids: &[ColumnId]) -> RepoResult<Vec<Card>> {
+            if self.fail {
+                return Err(RepositoryError::new("boom"));
+            }
+            let mut rows: Vec<Card> = self
+                .rows
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|c| column_ids.contains(&c.column_id))
+                .cloned()
+                .collect();
+            rows.sort_by(|a, b| {
+                a.position
+                    .value()
+                    .cmp(&b.position.value())
+                    .then(a.created_at.cmp(&b.created_at))
+            });
+            Ok(rows)
+        }
+
         async fn get(&self, id: CardId) -> RepoResult<Option<Card>> {
             Ok(self.rows.lock().unwrap().iter().find(|c| c.id == id).cloned())
         }

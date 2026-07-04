@@ -1,4 +1,5 @@
 pub mod board_service;
+pub mod board_view_service;
 pub mod card_service;
 pub mod column_service;
 pub mod error;
