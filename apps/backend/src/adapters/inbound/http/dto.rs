@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domain::board::Board;
+use crate::domain::card::Card;
 use crate::domain::column::Column;
 use crate::domain::project::Project;
 
@@ -111,4 +112,49 @@ pub struct CreateColumnRequest {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateColumnRequest {
     pub name: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CardResponse {
+    pub id: Uuid,
+    pub column_id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<Card> for CardResponse {
+    fn from(card: Card) -> Self {
+        Self {
+            id: card.id.as_uuid(),
+            column_id: card.column_id.as_uuid(),
+            title: card.title.into_string(),
+            description: card.description.into_string(),
+            position: card.position.value(),
+            created_at: card.created_at,
+            updated_at: card.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateCardRequest {
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateCardRequest {
+    pub title: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveCardRequest {
+    pub column_id: Uuid,
+    pub position: i32,
 }
