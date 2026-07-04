@@ -15,3 +15,23 @@ pub struct Card {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+impl Card {
+    pub fn new(
+        column_id: ColumnId,
+        title: Title,
+        description: Description,
+        position: Position,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: CardId::new(),
+            column_id,
+            title,
+            description,
+            position,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}

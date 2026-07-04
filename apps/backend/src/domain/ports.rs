@@ -7,11 +7,9 @@ use crate::domain::column::Column;
 use crate::domain::description::Description;
 use crate::domain::ids::{BoardId, CardId, ColumnId, ProjectId};
 use crate::domain::name::EntityName;
-use crate::domain::position::Position;
 use crate::domain::project::Project;
 use crate::domain::title::Title;
 
-/// Opaque so the domain never depends on a concrete driver (e.g. sqlx).
 #[derive(Debug, Error)]
 #[error("repository error: {message}")]
 pub struct RepositoryError {
@@ -33,6 +31,19 @@ pub enum LimitedInsert {
     Created,
     ParentMissing,
     LimitReached,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InsertOutcome {
+    Inserted,
+    ParentMissing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MoveOutcome {
+    Moved,
+    CardMissing,
+    TargetMissing,
 }
 
 #[async_trait]
@@ -69,12 +80,15 @@ pub trait ColumnRepository: Send + Sync {
 pub trait CardRepository: Send + Sync {
     async fn list_by_column(&self, column_id: ColumnId) -> RepoResult<Vec<Card>>;
     async fn get(&self, id: CardId) -> RepoResult<Option<Card>>;
-    async fn insert(&self, card: &Card) -> RepoResult<()>;
+    async fn insert(&self, card: &Card) -> RepoResult<InsertOutcome>;
     async fn update(&self, id: CardId, title: Title, description: Description) -> RepoResult<()>;
     async fn delete(&self, id: CardId) -> RepoResult<()>;
-    async fn reorder(&self, column_id: ColumnId, ordered_ids: &[CardId]) -> RepoResult<()>;
-    async fn move_to(&self, id: CardId, column_id: ColumnId, position: Position) -> RepoResult<()>;
-    async fn count_by_parent(&self, column_id: ColumnId) -> RepoResult<i64>;
+    async fn move_card(
+        &self,
+        id: CardId,
+        target_column: ColumnId,
+        position: i32,
+    ) -> RepoResult<MoveOutcome>;
 }
 
 #[cfg(test)]

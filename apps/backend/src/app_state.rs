@@ -3,9 +3,11 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::persistence::pg_board_repo::PgBoardRepo;
+use crate::adapters::outbound::persistence::pg_card_repo::PgCardRepo;
 use crate::adapters::outbound::persistence::pg_column_repo::PgColumnRepo;
 use crate::adapters::outbound::persistence::pg_project_repo::PgProjectRepo;
 use crate::application::board_service::BoardService;
+use crate::application::card_service::CardService;
 use crate::application::column_service::ColumnService;
 use crate::application::project_service::ProjectService;
 
@@ -15,6 +17,7 @@ pub struct AppState {
     pub projects: ProjectService,
     pub boards: BoardService,
     pub columns: ColumnService,
+    pub cards: CardService,
 }
 
 impl AppState {
@@ -22,11 +25,13 @@ impl AppState {
         let projects = ProjectService::new(Arc::new(PgProjectRepo::new(pool.clone())));
         let boards = BoardService::new(Arc::new(PgBoardRepo::new(pool.clone())));
         let columns = ColumnService::new(Arc::new(PgColumnRepo::new(pool.clone())));
+        let cards = CardService::new(Arc::new(PgCardRepo::new(pool.clone())));
         Self {
             pool,
             projects,
             boards,
             columns,
+            cards,
         }
     }
 }
