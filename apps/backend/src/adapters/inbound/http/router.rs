@@ -38,6 +38,7 @@ fn api_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::reorder))
         .routes(routes!(projects::update, projects::delete))
         .routes(routes!(boards::list, boards::create))
+        .routes(routes!(boards::full))
         .routes(routes!(boards::reorder))
         .routes(routes!(boards::update, boards::delete))
         .routes(routes!(columns::list, columns::create))

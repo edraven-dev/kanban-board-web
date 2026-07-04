@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::application::board_view_service::{BoardView, ColumnView};
 use crate::domain::board::Board;
 use crate::domain::card::Card;
 use crate::domain::column::Column;
@@ -157,4 +158,56 @@ pub struct UpdateCardRequest {
 pub struct MoveCardRequest {
     pub column_id: Uuid,
     pub position: i32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BoardFullResponse {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub name: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub columns: Vec<ColumnFullResponse>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnFullResponse {
+    pub id: Uuid,
+    pub board_id: Uuid,
+    pub name: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub cards: Vec<CardResponse>,
+}
+
+impl From<BoardView> for BoardFullResponse {
+    fn from(view: BoardView) -> Self {
+        Self {
+            id: view.board.id.as_uuid(),
+            project_id: view.board.project_id.as_uuid(),
+            name: view.board.name.into_string(),
+            position: view.board.position.value(),
+            created_at: view.board.created_at,
+            updated_at: view.board.updated_at,
+            columns: view.columns.into_iter().map(ColumnFullResponse::from).collect(),
+        }
+    }
+}
+
+impl From<ColumnView> for ColumnFullResponse {
+    fn from(view: ColumnView) -> Self {
+        Self {
+            id: view.column.id.as_uuid(),
+            board_id: view.column.board_id.as_uuid(),
+            name: view.column.name.into_string(),
+            position: view.column.position.value(),
+            created_at: view.column.created_at,
+            updated_at: view.column.updated_at,
+            cards: view.cards.into_iter().map(CardResponse::from).collect(),
+        }
+    }
 }

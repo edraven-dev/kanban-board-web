@@ -58,6 +58,22 @@ impl CardRepository for PgCardRepo {
         records.into_iter().map(Card::try_from).collect()
     }
 
+    async fn list_by_columns(&self, column_ids: &[ColumnId]) -> RepoResult<Vec<Card>> {
+        let ids: Vec<Uuid> = column_ids.iter().map(|id| id.as_uuid()).collect();
+        let records = sqlx::query_as!(
+            CardRecord,
+            r#"SELECT id, column_id, title, description, position, created_at, updated_at
+               FROM cards
+               WHERE column_id = ANY($1)
+               ORDER BY position, created_at"#,
+            &ids,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(to_repo_error)?;
+        records.into_iter().map(Card::try_from).collect()
+    }
+
     async fn get(&self, id: CardId) -> RepoResult<Option<Card>> {
         let record = sqlx::query_as!(
             CardRecord,

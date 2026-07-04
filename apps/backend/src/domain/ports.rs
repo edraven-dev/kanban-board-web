@@ -79,6 +79,7 @@ pub trait ColumnRepository: Send + Sync {
 #[async_trait]
 pub trait CardRepository: Send + Sync {
     async fn list_by_column(&self, column_id: ColumnId) -> RepoResult<Vec<Card>>;
+    async fn list_by_columns(&self, column_ids: &[ColumnId]) -> RepoResult<Vec<Card>>;
     async fn get(&self, id: CardId) -> RepoResult<Option<Card>>;
     async fn insert(&self, card: &Card) -> RepoResult<InsertOutcome>;
     async fn update(&self, id: CardId, title: Title, description: Description) -> RepoResult<()>;
