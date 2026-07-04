@@ -2,19 +2,27 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
+use crate::adapters::outbound::persistence::pg_board_repo::PgBoardRepo;
 use crate::adapters::outbound::persistence::pg_project_repo::PgProjectRepo;
+use crate::application::board_service::BoardService;
 use crate::application::project_service::ProjectService;
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub projects: ProjectService,
+    pub boards: BoardService,
 }
 
 impl AppState {
     pub fn new(pool: PgPool) -> Self {
         let projects = ProjectService::new(Arc::new(PgProjectRepo::new(pool.clone())));
-        Self { pool, projects }
+        let boards = BoardService::new(Arc::new(PgBoardRepo::new(pool.clone())));
+        Self {
+            pool,
+            projects,
+            boards,
+        }
     }
 }
 

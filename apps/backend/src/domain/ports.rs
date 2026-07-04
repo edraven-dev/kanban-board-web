@@ -28,6 +28,13 @@ impl RepositoryError {
 
 pub type RepoResult<T> = Result<T, RepositoryError>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitedInsert {
+    Created,
+    ParentMissing,
+    LimitReached,
+}
+
 #[async_trait]
 pub trait ProjectRepository: Send + Sync {
     async fn list(&self) -> RepoResult<Vec<Project>>;
@@ -42,11 +49,10 @@ pub trait ProjectRepository: Send + Sync {
 pub trait BoardRepository: Send + Sync {
     async fn list_by_project(&self, project_id: ProjectId) -> RepoResult<Vec<Board>>;
     async fn get(&self, id: BoardId) -> RepoResult<Option<Board>>;
-    async fn insert(&self, board: &Board) -> RepoResult<()>;
+    async fn insert_within_limit(&self, board: &Board, max: i64) -> RepoResult<LimitedInsert>;
     async fn update(&self, id: BoardId, name: EntityName) -> RepoResult<()>;
     async fn delete(&self, id: BoardId) -> RepoResult<()>;
     async fn reorder(&self, project_id: ProjectId, ordered_ids: &[BoardId]) -> RepoResult<()>;
-    async fn count_by_parent(&self, project_id: ProjectId) -> RepoResult<i64>;
 }
 
 #[async_trait]
