@@ -1,8 +1,15 @@
 use axum::body::Body;
 use axum::http::{header, Method, Request, StatusCode};
+use backend::app_state::AppState;
 use backend::infrastructure::config::AppEnv;
 use backend::router;
-use tower::ServiceExt; // for `oneshot`
+use sqlx::PgPool;
+use tower::ServiceExt;
+
+
+fn test_state() -> AppState {
+    AppState::new(PgPool::connect_lazy("postgres://kanban:kanban@localhost:5432/kanban").unwrap())
+}
 
 fn get(uri: &str, origin: Option<&str>) -> Request<Body> {
     let mut builder = Request::builder().method(Method::GET).uri(uri);
@@ -14,7 +21,7 @@ fn get(uri: &str, origin: Option<&str>) -> Request<Body> {
 
 #[tokio::test]
 async fn health_returns_ok_json_under_the_api_prefix() {
-    let res = router(AppEnv::Development)
+    let res = router(AppEnv::Development, test_state())
         .oneshot(get("/api/health", None))
         .await
         .unwrap();
@@ -29,7 +36,7 @@ async fn health_returns_ok_json_under_the_api_prefix() {
 
 #[tokio::test]
 async fn root_health_is_not_found() {
-    let res = router(AppEnv::Development)
+    let res = router(AppEnv::Development, test_state())
         .oneshot(get("/health", None))
         .await
         .unwrap();
@@ -38,7 +45,7 @@ async fn root_health_is_not_found() {
 
 #[tokio::test]
 async fn development_applies_cors() {
-    let res = router(AppEnv::Development)
+    let res = router(AppEnv::Development, test_state())
         .oneshot(get("/api/health", Some("http://localhost:3000")))
         .await
         .unwrap();
@@ -52,7 +59,7 @@ async fn development_applies_cors() {
 
 #[tokio::test]
 async fn openapi_spec_is_served_and_documents_health() {
-    let res = router(AppEnv::Development)
+    let res = router(AppEnv::Development, test_state())
         .oneshot(get("/api/openapi.json", None))
         .await
         .unwrap();
@@ -66,11 +73,15 @@ async fn openapi_spec_is_served_and_documents_health() {
         spec["paths"]["/api/health"].is_object(),
         "OpenAPI spec must document /api/health"
     );
+    assert!(
+        spec["paths"]["/api/projects"].is_object(),
+        "OpenAPI spec must document /api/projects"
+    );
 }
 
 #[tokio::test]
 async fn production_emits_no_cors_header() {
-    let res = router(AppEnv::Production)
+    let res = router(AppEnv::Production, test_state())
         .oneshot(get("/api/health", Some("http://localhost:3000")))
         .await
         .unwrap();

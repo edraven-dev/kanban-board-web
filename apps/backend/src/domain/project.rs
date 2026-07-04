@@ -12,3 +12,16 @@ pub struct Project {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+impl Project {
+    pub fn new(name: EntityName, position: Position) -> Self {
+        let now = Utc::now();
+        Self {
+            id: ProjectId::new(),
+            name,
+            position,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}

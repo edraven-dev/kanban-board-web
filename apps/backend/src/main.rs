@@ -15,10 +15,9 @@ async fn main() {
     let pool = db::connect(&config)
         .await
         .expect("failed to connect to the database");
-    // Wired into the router in B3+.
-    let _state = AppState::new(pool);
+    let state = AppState::new(pool);
 
-    let app = router(config.app_env);
+    let app = router(config.app_env, state);
 
     let listener = TcpListener::bind(("0.0.0.0", config.port))
         .await
