@@ -23,6 +23,24 @@ pnpm --filter backend dev   # or: cargo run
 - `APP_ENV=production` adds **no** CORS layer — production is served same-origin
   under `host.com/api`.
 
+## Migrations
+
+SQL migrations live in `migrations/` (timestamped `<YYYYMMDDHHMMSS>_<name>.sql`) and
+are applied automatically on app startup and in tests. Managed with `sqlx-cli`
+(`cargo install sqlx-cli --no-default-features --features rustls,postgres`):
+
+```bash
+pnpm --filter backend migrate:add <name>   # scaffold a new (empty) migration file
+pnpm --filter backend migrate:run          # apply pending migrations (uses DATABASE_URL)
+pnpm --filter backend migrate:info         # show applied / pending status
+pnpm --filter backend migrate:revert       # roll back the last migration
+```
+
+`migrate:add` only creates the file — you write the SQL (sqlx is not an ORM; there's
+no schema diffing). Compile-time-checked queries (`query!`, from later tasks) use an
+offline cache in `.sqlx/` via `cargo sqlx prepare`; set `SQLX_OFFLINE=true` to build
+without a database.
+
 ## Test
 
 ```bash

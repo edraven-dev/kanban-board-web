@@ -101,6 +101,24 @@ pub async fn setup_db() -> PgPool {
         .expect("connect to test database")
 }
 
+#[allow(dead_code)]
+pub async fn fresh_database_url() -> String {
+    let shared = shared().await;
+    let db = format!("test_{}", Uuid::now_v7().simple());
+
+    let _guard = CREATE_DB_LOCK.lock().await;
+    let mut admin = PgConnection::connect(&shared.url("postgres"))
+        .await
+        .expect("connect to admin database");
+    sqlx::query(sqlx::AssertSqlSafe(format!(r#"CREATE DATABASE "{db}""#)))
+        .execute(&mut admin)
+        .await
+        .expect("create empty database");
+    admin.close().await.ok();
+
+    shared.url(&db)
+}
+
 /// Defines a Postgres-backed test. The body receives a `PgPool` connected to an
 /// isolated, migrated database cloned from the per-binary template.
 ///

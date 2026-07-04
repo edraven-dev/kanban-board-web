@@ -1,5 +1,11 @@
+//! Tests for the DB infrastructure: the testcontainers harness and `db::connect`.
+//! Per-aggregate schema behaviour (cascades, foreign keys, inserts) is tested in
+//! each aggregate's slice, alongside the migration that creates its tables.
+
 mod common;
 
+use backend::infrastructure::config::{AppEnv, Config};
+use backend::infrastructure::db;
 use common::db_test;
 
 db_test! {
@@ -28,8 +34,8 @@ db_test! {
 
 db_test! {
     async fn databases_are_isolated_between_tests(pool: PgPool) {
-        // The table created by the other test must not exist here - each test runs
-        // against its own database cloned from the (empty) template.
+        // The table created by the other test must not exist here — each test runs
+        // against its own database cloned from the template.
         let exists: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'only_here')",
         )
@@ -38,4 +44,23 @@ db_test! {
         .expect("check table isolation");
         assert!(!exists, "each test must get an isolated database");
     }
+}
+
+#[tokio::test]
+async fn connect_runs_migrations_and_returns_a_usable_pool() {
+    let config = Config {
+        app_env: AppEnv::Development,
+        database_url: common::fresh_database_url().await,
+        port: 0,
+    };
+
+    let pool = db::connect(&config)
+        .await
+        .expect("connect and run migrations");
+
+    let one: i32 = sqlx::query_scalar("SELECT 1")
+        .fetch_one(&pool)
+        .await
+        .expect("query via the connected pool");
+    assert_eq!(one, 1);
 }
