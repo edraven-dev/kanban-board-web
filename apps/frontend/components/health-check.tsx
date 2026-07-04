@@ -33,7 +33,7 @@ const INDICATOR = {
 
 async function fetchHealth(): Promise<Status> {
   try {
-    const res = await fetch(`${API_URL}/health`);
+    const res = await fetch(`${API_URL}/api/health`);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
