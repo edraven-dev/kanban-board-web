@@ -1,11 +1,10 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 macro_rules! typed_id {
     ($name:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub struct $name(Uuid);
 
         impl $name {

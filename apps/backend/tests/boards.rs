@@ -22,7 +22,10 @@ use uuid::Uuid;
 
 async fn seed_project(pool: &sqlx::PgPool) -> ProjectId {
     let repo = PgProjectRepo::new(pool.clone());
-    let p = Project::new(EntityName::new("Parent").unwrap(), Position::new(0).unwrap());
+    let p = Project::new(
+        EntityName::new("Parent").unwrap(),
+        Position::new(0).unwrap(),
+    );
     repo.insert(&p).await.unwrap();
     p.id
 }
@@ -35,10 +38,6 @@ fn board(project: ProjectId, name: &str, position: i32) -> Board {
     )
 }
 
-// ---------------------------------------------------------------------------
-// Repository tests
-// ---------------------------------------------------------------------------
-
 db_test! {
     async fn insert_within_limit_creates_and_round_trips(pool: PgPool) {
         let project = seed_project(&pool).await;
@@ -46,20 +45,19 @@ db_test! {
         let b = board(project, "Backlog", 0);
 
         assert_eq!(repo.insert_within_limit(&b, 99).await.unwrap(), LimitedInsert::Created);
-        let fetched = repo.get(b.id).await.unwrap().unwrap();
+        let fetched = repo.summary(b.id).await.unwrap().unwrap();
         assert_eq!(fetched.name.as_str(), "Backlog");
         assert_eq!(fetched.project_id, project);
     }
 }
 
 db_test! {
-    async fn insert_under_a_missing_project_is_parent_missing(pool: PgPool) {
+    // Existence is the directory's job now; the FK is only a backstop, so an orphan errors.
+    async fn insert_under_a_missing_project_violates_the_foreign_key(pool: PgPool) {
         let repo = PgBoardRepo::new(pool);
         let b = board(ProjectId::new(), "orphan", 0);
-        assert_eq!(
-            repo.insert_within_limit(&b, 99).await.unwrap(),
-            LimitedInsert::ParentMissing
-        );
+        let err = repo.insert_within_limit(&b, 99).await.unwrap_err();
+        assert!(err.to_string().contains("repository error"));
     }
 }
 
@@ -70,7 +68,6 @@ db_test! {
 
         assert_eq!(repo.insert_within_limit(&board(project, "A", 0), 2).await.unwrap(), LimitedInsert::Created);
         assert_eq!(repo.insert_within_limit(&board(project, "B", 1), 2).await.unwrap(), LimitedInsert::Created);
-        // Third insert would exceed the limit of 2 — rejected, and not written.
         assert_eq!(repo.insert_within_limit(&board(project, "C", 2), 2).await.unwrap(), LimitedInsert::LimitReached);
         assert_eq!(repo.list_by_project(project).await.unwrap().len(), 2);
     }
@@ -99,7 +96,7 @@ db_test! {
 db_test! {
     async fn get_of_a_missing_board_is_none(pool: PgPool) {
         let repo = PgBoardRepo::new(pool);
-        assert!(repo.get(BoardId::new()).await.unwrap().is_none());
+        assert!(repo.summary(BoardId::new()).await.unwrap().is_none());
     }
 }
 
@@ -110,7 +107,7 @@ db_test! {
         let b = board(project, "Old", 0);
         repo.insert_within_limit(&b, 99).await.unwrap();
         repo.update(b.id, EntityName::new("New").unwrap()).await.unwrap();
-        assert_eq!(repo.get(b.id).await.unwrap().unwrap().name.as_str(), "New");
+        assert_eq!(repo.summary(b.id).await.unwrap().unwrap().name.as_str(), "New");
     }
 }
 
@@ -121,7 +118,7 @@ db_test! {
         let b = board(project, "Gone", 0);
         repo.insert_within_limit(&b, 99).await.unwrap();
         repo.delete(b.id).await.unwrap();
-        assert!(repo.get(b.id).await.unwrap().is_none());
+        assert!(repo.summary(b.id).await.unwrap().is_none());
     }
 }
 
@@ -157,7 +154,6 @@ db_test! {
         let repo = PgBoardRepo::new(pool);
         let b = board(project, "Dup", 0);
         repo.insert_within_limit(&b, 99).await.unwrap();
-        // Re-inserting the same id violates the primary key inside the transaction.
         let err = repo.insert_within_limit(&b, 99).await.unwrap_err();
         assert!(err.to_string().contains("repository error"));
     }
@@ -186,13 +182,9 @@ db_test! {
             .execute(&pool)
             .await
             .unwrap();
-        assert!(PgBoardRepo::new(pool).get(BoardId::from_uuid(id)).await.is_err());
+        assert!(PgBoardRepo::new(pool).summary(BoardId::from_uuid(id)).await.is_err());
     }
 }
-
-// ---------------------------------------------------------------------------
-// HTTP handler tests
-// ---------------------------------------------------------------------------
 
 fn app(pool: &sqlx::PgPool) -> Router {
     router(AppEnv::Development, AppState::new(pool.clone()))
@@ -216,7 +208,9 @@ fn empty_request(method: Method, uri: &str) -> Request<Body> {
 }
 
 async fn read_json(res: Response) -> Value {
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
@@ -276,7 +270,6 @@ db_test! {
 db_test! {
     async fn post_beyond_the_limit_is_409(pool: PgPool) {
         let project = seed_project(&pool).await;
-        // Seed 99 boards straight through the repo, then the 100th via HTTP is rejected.
         let repo = PgBoardRepo::new(pool.clone());
         for i in 0..99 {
             let b = board(project, &format!("B{i}"), i);

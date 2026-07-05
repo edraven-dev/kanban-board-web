@@ -28,10 +28,10 @@ in-memory fakes and Postgres stays a swappable detail.
 
 ### Domain model
 
-**Two aggregate roots** (for now): **Project** and **Board**. `Column` and `Card` are
-entities *within* the Board aggregate — the board is their consistency boundary and
-owns their ordering and count limits. (Either may become its own root later if it grows
-independent invariants — hence "for now".)
+**Two aggregate roots**: **Project** and **Board**. The `Board` root **owns** its ordered
+`Column`s, each owning its ordered `Card`s — one consistency boundary, one ownership
+tree. All structural changes to columns and cards go through methods on the `Board` root
+(`src/domain/board.rs`), which enforce the invariants below.
 
 | Entity | Aggregate | Key rules |
 |---|---|---|
@@ -40,12 +40,26 @@ independent invariants — hence "for now".)
 | **Column** | Board | name 1–120; **≤ 99 columns per board** |
 | **Card** | Board | title 1–200; description ≤ 10 000 (may be empty) |
 
-Invariants live in the domain (value-object constructors return `Result<_,
-DomainError>`); the ≤ 99 limits are enforced in the application layer within the same
-transaction as the insert. Ordering is a contiguous integer `position` (0..n-1) scoped
-to the parent, rewritten transactionally on reorder/move. Persistence keeps a
-repository per entity as an implementation detail — the aggregate boundary is a
-domain/consistency concept, not a 1:1 repository mapping.
+Value-object constructors return `Result<_, DomainError>`; the `Board` root returns
+`BoardError` for structural failures (missing column/card, column limit, bad reorder
+set). The **≤ 99 columns** limit and same-/cross-column card moves are enforced by the
+`Board` root; **≤ 99 boards per project** is a Board-side concern checked in
+`BoardService`. Ordering is a contiguous integer `position` (0..n-1) scoped to the
+parent, re-sequenced by the root and persisted with the aggregate.
+
+**One repository per aggregate root.** `PgProjectRepo` owns the `projects` table;
+`PgBoardRepo` owns `boards` + `columns` + `cards`. Column/card writes **load the whole
+board aggregate, mutate it through the `Board` root, and save the whole tree in one
+transaction** (`save`) — generalizing the board-full read model to the write side.
+
+**Aggregate boundaries are non-negotiable** (see the root `CLAUDE.md`): a repository's
+SQL may touch **only its own aggregate's tables**. `PgBoardRepo` never reads `projects`;
+when the Board aggregate needs to know a project exists (creating a board), it asks the
+`ProjectDirectory` **system service** — the Project aggregate's public interface — rather
+than querying the `projects` table. In this monolith the directory is backed by the
+Project repository; across a service split it would be an API call. The
+`boards.project_id → projects.id` foreign key is kept only as a database safety net, not
+as a licence to read across the boundary.
 
 ## Run locally
 

@@ -61,7 +61,6 @@ export function SortableTileGrid<T extends TileItem>({
   const reorder = useReorder<T>(queryKey, reorderPersist);
 
   // Distance constraint so a tap opens the tile and only a drag reorders it.
-  // Keyboard sensor drives reordering from the tile's drag handle.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {

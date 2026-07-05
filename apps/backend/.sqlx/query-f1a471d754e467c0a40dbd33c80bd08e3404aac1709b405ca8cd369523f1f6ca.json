@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO columns (id, board_id, name, position, created_at, updated_at)\n                   VALUES ($1, $2, $3, $4, $5, $6)\n                   ON CONFLICT (id) DO UPDATE\n                     SET name = EXCLUDED.name,\n                         position = EXCLUDED.position,\n                         updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f1a471d754e467c0a40dbd33c80bd08e3404aac1709b405ca8cd369523f1f6ca"
+}

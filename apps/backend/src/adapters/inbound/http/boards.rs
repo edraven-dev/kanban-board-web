@@ -53,12 +53,12 @@ pub async fn full(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<BoardFullResponse>, ApplicationError> {
-    let view = state
-        .board_view
+    let board = state
+        .boards
         .get_full(BoardId::from_uuid(id))
         .await?
         .ok_or(ApplicationError::NotFound)?;
-    Ok(Json(view.into()))
+    Ok(Json(board.into()))
 }
 
 #[utoipa::path(
@@ -72,7 +72,10 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateBoardRequest>,
 ) -> Result<Json<BoardResponse>, ApplicationError> {
-    let board = state.boards.update(BoardId::from_uuid(id), &body.name).await?;
+    let board = state
+        .boards
+        .update(BoardId::from_uuid(id), &body.name)
+        .await?;
     Ok(Json(board.into()))
 }
 
@@ -100,7 +103,11 @@ pub async fn reorder(
     Path(project_id): Path<Uuid>,
     Json(body): Json<ReorderRequest>,
 ) -> Result<StatusCode, ApplicationError> {
-    let ids = body.ordered_ids.into_iter().map(BoardId::from_uuid).collect();
+    let ids = body
+        .ordered_ids
+        .into_iter()
+        .map(BoardId::from_uuid)
+        .collect();
     state
         .boards
         .reorder(ProjectId::from_uuid(project_id), ids)

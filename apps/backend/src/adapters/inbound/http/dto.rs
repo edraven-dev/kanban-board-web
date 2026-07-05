@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::application::board_view_service::{BoardView, ColumnView};
-use crate::domain::board::Board;
+use crate::domain::board::{Board, BoardSummary};
 use crate::domain::card::Card;
 use crate::domain::column::Column;
 use crate::domain::project::Project;
@@ -58,8 +57,8 @@ pub struct BoardResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<Board> for BoardResponse {
-    fn from(board: Board) -> Self {
+impl From<BoardSummary> for BoardResponse {
+    fn from(board: BoardSummary) -> Self {
         Self {
             id: board.id.as_uuid(),
             project_id: board.project_id.as_uuid(),
@@ -184,30 +183,34 @@ pub struct ColumnFullResponse {
     pub cards: Vec<CardResponse>,
 }
 
-impl From<BoardView> for BoardFullResponse {
-    fn from(view: BoardView) -> Self {
+impl From<Board> for BoardFullResponse {
+    fn from(board: Board) -> Self {
         Self {
-            id: view.board.id.as_uuid(),
-            project_id: view.board.project_id.as_uuid(),
-            name: view.board.name.into_string(),
-            position: view.board.position.value(),
-            created_at: view.board.created_at,
-            updated_at: view.board.updated_at,
-            columns: view.columns.into_iter().map(ColumnFullResponse::from).collect(),
+            id: board.id.as_uuid(),
+            project_id: board.project_id.as_uuid(),
+            name: board.name.into_string(),
+            position: board.position.value(),
+            created_at: board.created_at,
+            updated_at: board.updated_at,
+            columns: board
+                .columns
+                .into_iter()
+                .map(ColumnFullResponse::from)
+                .collect(),
         }
     }
 }
 
-impl From<ColumnView> for ColumnFullResponse {
-    fn from(view: ColumnView) -> Self {
+impl From<Column> for ColumnFullResponse {
+    fn from(column: Column) -> Self {
         Self {
-            id: view.column.id.as_uuid(),
-            board_id: view.column.board_id.as_uuid(),
-            name: view.column.name.into_string(),
-            position: view.column.position.value(),
-            created_at: view.column.created_at,
-            updated_at: view.column.updated_at,
-            cards: view.cards.into_iter().map(CardResponse::from).collect(),
+            id: column.id.as_uuid(),
+            board_id: column.board_id.as_uuid(),
+            name: column.name.into_string(),
+            position: column.position.value(),
+            created_at: column.created_at,
+            updated_at: column.updated_at,
+            cards: column.cards.into_iter().map(CardResponse::from).collect(),
         }
     }
 }

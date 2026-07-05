@@ -60,3 +60,40 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Aggregate Boundaries Are Non-Negotiable
+
+**SQL must never cross an aggregate boundary. This rule does not bend.**
+
+The backend has exactly two aggregate roots: **Project** and **Board** (Board owns its
+Columns, which own their Cards). Each aggregate root has **one repository**, and a
+repository's SQL may only read/write the tables of **its own** aggregate.
+
+- **No cross-aggregate joins or reads.** A query in the Board aggregate's repository may
+  not `SELECT`/`JOIN`/`FROM` the `projects` table (or any table outside the Board
+  aggregate), and vice versa. Intra-aggregate joins (Board↔Columns↔Cards) are fine.
+- **Reference other aggregates by id only.** When one aggregate needs data or a fact
+  about another (e.g. "does this project exist?"), it must obtain it **through a system
+  service / port** that represents the other aggregate's public interface — never by
+  querying the other aggregate's tables directly. In this monolith that port stands in
+  for what would be an API call across a service boundary.
+- The test: if you deleted the other aggregate's tables, this repository's SQL would
+  still compile and make sense. If it wouldn't, you've crossed the boundary — stop.
+
+A cross-aggregate foreign key kept purely as a database safety net (e.g.
+`boards.project_id → projects.id`) is allowed, but it is **not** a licence to read across
+the boundary in application queries.
+
+## 6. Comments
+
+**Comment sparingly. Document public interfaces.**
+
+- No verbose or narrating comments. A comment earns its place only when the code can't
+  say it itself — a non-obvious *why*, a subtle invariant, a gotcha. Prefer one tight
+  line over a paragraph.
+- Never restate what the code already says. If a comment paraphrases the next line,
+  delete it. Strip existing verbose comments as you touch code.
+- **Document public boundaries when the contract isn't obvious.** A public type, trait,
+  or function crossing a module/aggregate boundary gets a concise doc comment (`///`
+  rustdoc, JSDoc/TSDoc) *only* when its contract isn't already clear from the signature.
+  One line stating what/why, never how. Don't doc self-evident items.

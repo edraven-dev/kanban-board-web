@@ -35,10 +35,7 @@ export function reorder<T extends Identifiable>(
   return arrayMove(items, from, to);
 }
 
-/**
- * Generic optimistic drag-reorder for any cached list. The cache is reordered
- * immediately; `persist` receives the resulting id order to save server-side.
- */
+/** Generic optimistic drag-reorder for a cached list; `persist` saves the new id order. */
 export function useReorder<T extends Identifiable>(
   queryKey: readonly unknown[],
   persist: (orderedIds: string[]) => Promise<void>,

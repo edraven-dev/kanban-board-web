@@ -25,7 +25,6 @@ function board(id: string, name: string, position: number): Board {
   return { id, projectId, name, position, createdAt: ts, updatedAt: ts };
 }
 
-// The header's ProjectSwitcher lists all projects.
 function stubProjects() {
   return http.get(`${BASE}/projects`, () =>
     HttpResponse.json([
@@ -55,7 +54,6 @@ describe("ProjectBoards", () => {
       "href",
       `/boards/${b2}`,
     );
-    // Each tile exposes a keyboard-accessible reorder handle.
     expect(
       screen.getByRole("button", { name: "Reorder Sprint 1" }),
     ).toBeInTheDocument();

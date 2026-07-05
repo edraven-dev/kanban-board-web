@@ -20,11 +20,7 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/**
- * Expandable "+ Add" affordance reused for board/column/card creation. Submits
- * on Enter or the Add button, clears for the next entry, and collapses on Cancel
- * or Esc.
- */
+/** Expandable "+ Add" affordance for board/column/card creation; Enter/Add submits, Esc cancels. */
 export function InlineCreate({
   label,
   onCreate,

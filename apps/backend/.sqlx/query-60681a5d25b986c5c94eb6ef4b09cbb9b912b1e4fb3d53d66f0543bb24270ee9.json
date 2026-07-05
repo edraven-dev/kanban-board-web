@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, column_id, title, description, position, created_at, updated_at\n               FROM cards\n               WHERE column_id = ANY($1)\n               ORDER BY position, created_at",
+  "query": "SELECT id, project_id, name, position, created_at, updated_at\n               FROM boards WHERE project_id = $1 ORDER BY position, created_at",
   "describe": {
     "columns": [
       {
@@ -9,73 +9,62 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "cards",
+            "table": "boards",
             "name": "id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "column_id",
+        "name": "project_id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "cards",
-            "name": "column_id"
+            "table": "boards",
+            "name": "project_id"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "title",
+        "name": "name",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "cards",
-            "name": "title"
+            "table": "boards",
+            "name": "name"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "description",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "cards",
-            "name": "description"
-          }
-        }
-      },
-      {
-        "ordinal": 4,
         "name": "position",
         "type_info": "Int4",
         "origin": {
           "Table": {
-            "table": "cards",
+            "table": "boards",
             "name": "position"
           }
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "cards",
+            "table": "boards",
             "name": "created_at"
           }
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "cards",
+            "table": "boards",
             "name": "updated_at"
           }
         }
@@ -83,7 +72,7 @@
     ],
     "parameters": {
       "Left": [
-        "UuidArray"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -92,9 +81,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "3890222535c6fed22448a7a15aa40722b2ede28b76c260597467bb492f734a2a"
+  "hash": "60681a5d25b986c5c94eb6ef4b09cbb9b912b1e4fb3d53d66f0543bb24270ee9"
 }

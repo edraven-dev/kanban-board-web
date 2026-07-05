@@ -19,7 +19,10 @@ pub async fn list(
     State(state): State<AppState>,
     Path(column_id): Path<Uuid>,
 ) -> Result<Json<Vec<CardResponse>>, ApplicationError> {
-    let cards = state.cards.list(ColumnId::from_uuid(column_id)).await?;
+    let cards = state
+        .boards
+        .list_cards(ColumnId::from_uuid(column_id))
+        .await?;
     Ok(Json(cards.into_iter().map(CardResponse::from).collect()))
 }
 
@@ -35,8 +38,8 @@ pub async fn create(
     Json(body): Json<CreateCardRequest>,
 ) -> Result<(StatusCode, Json<CardResponse>), ApplicationError> {
     let card = state
-        .cards
-        .create(
+        .boards
+        .create_card(
             ColumnId::from_uuid(column_id),
             &body.title,
             body.description.as_deref(),
@@ -54,7 +57,7 @@ pub async fn get(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<CardResponse>, ApplicationError> {
-    let card = state.cards.get(CardId::from_uuid(id)).await?;
+    let card = state.boards.get_card(CardId::from_uuid(id)).await?;
     Ok(Json(card.into()))
 }
 
@@ -70,8 +73,8 @@ pub async fn update(
     Json(body): Json<UpdateCardRequest>,
 ) -> Result<Json<CardResponse>, ApplicationError> {
     let card = state
-        .cards
-        .update(
+        .boards
+        .update_card(
             CardId::from_uuid(id),
             body.title.as_deref(),
             body.description.as_deref(),
@@ -89,7 +92,7 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApplicationError> {
-    state.cards.delete(CardId::from_uuid(id)).await?;
+    state.boards.delete_card(CardId::from_uuid(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -105,7 +108,7 @@ pub async fn move_card(
     Json(body): Json<MoveCardRequest>,
 ) -> Result<StatusCode, ApplicationError> {
     state
-        .cards
+        .boards
         .move_card(
             CardId::from_uuid(id),
             ColumnId::from_uuid(body.column_id),

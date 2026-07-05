@@ -40,7 +40,10 @@ impl ProjectService {
     pub async fn update(&self, id: ProjectId, name: &str) -> Result<Project, ApplicationError> {
         let name = EntityName::new(name)?;
         self.projects.update(id, name).await?;
-        self.projects.get(id).await?.ok_or(ApplicationError::NotFound)
+        self.projects
+            .get(id)
+            .await?
+            .ok_or(ApplicationError::NotFound)
     }
 
     pub async fn delete(&self, id: ProjectId) -> Result<(), ApplicationError> {
@@ -52,8 +55,13 @@ impl ProjectService {
     }
 
     pub async fn reorder(&self, ordered_ids: Vec<ProjectId>) -> Result<(), ApplicationError> {
-        let existing: Vec<ProjectId> =
-            self.projects.list().await?.into_iter().map(|p| p.id).collect();
+        let existing: Vec<ProjectId> = self
+            .projects
+            .list()
+            .await?
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
         ensure_permutation(&existing, &ordered_ids)?;
         self.projects.reorder(&ordered_ids).await?;
         Ok(())
@@ -109,7 +117,13 @@ mod tests {
         }
 
         async fn get(&self, id: ProjectId) -> RepoResult<Option<Project>> {
-            Ok(self.rows.lock().unwrap().iter().find(|p| p.id == id).cloned())
+            Ok(self
+                .rows
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|p| p.id == id)
+                .cloned())
         }
 
         async fn insert(&self, project: &Project) -> RepoResult<()> {
@@ -243,8 +257,10 @@ mod tests {
         let ia = a.id;
         let service = ProjectService::new(FakeProjectRepo::with(vec![a, b]));
 
-        // Missing `b`, plus an unknown id.
-        let err = service.reorder(vec![ia, ProjectId::new()]).await.unwrap_err();
+        let err = service
+            .reorder(vec![ia, ProjectId::new()])
+            .await
+            .unwrap_err();
         assert!(matches!(err, ApplicationError::Unprocessable(_)));
     }
 

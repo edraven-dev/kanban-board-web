@@ -1,9 +1,4 @@
-/**
- * Deterministic pastel gradient derived from a seed (e.g. an entity id).
- *
- * Deterministic — not `Math.random()` — so a tile keeps the same colour across
- * reloads and server/client renders (avoids hydration mismatches).
- */
+/** Deterministic pastel gradient from a seed — stable across reloads/SSR (no hydration mismatch). */
 export function pastelGradient(seed: string): string {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {

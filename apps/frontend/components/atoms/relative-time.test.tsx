@@ -22,7 +22,6 @@ describe("RelativeTime", () => {
     render(<RelativeTime date={new Date("2026-07-05T11:59:00Z")} />);
     expect(screen.getByText("created 1 minute ago")).toBeInTheDocument();
 
-    // Advancing timers also advances the fake clock by 60s.
     act(() => {
       vi.advanceTimersByTime(60_000);
     });

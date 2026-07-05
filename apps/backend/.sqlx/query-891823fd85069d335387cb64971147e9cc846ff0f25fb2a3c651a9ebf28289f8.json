@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, board_id, name, position, created_at, updated_at\n               FROM columns\n               WHERE id = $1",
+  "query": "SELECT id, project_id, name, position, created_at, updated_at\n               FROM boards WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -9,19 +9,19 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "columns",
+            "table": "boards",
             "name": "id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "board_id",
+        "name": "project_id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "columns",
-            "name": "board_id"
+            "table": "boards",
+            "name": "project_id"
           }
         }
       },
@@ -31,7 +31,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "columns",
+            "table": "boards",
             "name": "name"
           }
         }
@@ -42,7 +42,7 @@
         "type_info": "Int4",
         "origin": {
           "Table": {
-            "table": "columns",
+            "table": "boards",
             "name": "position"
           }
         }
@@ -53,7 +53,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "columns",
+            "table": "boards",
             "name": "created_at"
           }
         }
@@ -64,7 +64,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "columns",
+            "table": "boards",
             "name": "updated_at"
           }
         }
@@ -84,5 +84,5 @@
       false
     ]
   },
-  "hash": "b6726f54b55352749f3857f6d8d11a2af1b38ad3b65f8f520fc83b2e5f5e4614"
+  "hash": "891823fd85069d335387cb64971147e9cc846ff0f25fb2a3c651a9ebf28289f8"
 }

@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::{
-    CreateProjectRequest, ProjectResponse, UpdateProjectRequest, ReorderRequest,
+    CreateProjectRequest, ProjectResponse, ReorderRequest, UpdateProjectRequest,
 };
 use crate::app_state::AppState;
 use crate::application::error::ApplicationError;
@@ -18,7 +18,9 @@ pub async fn list(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ProjectResponse>>, ApplicationError> {
     let projects = state.projects.list().await?;
-    Ok(Json(projects.into_iter().map(ProjectResponse::from).collect()))
+    Ok(Json(
+        projects.into_iter().map(ProjectResponse::from).collect(),
+    ))
 }
 
 #[utoipa::path(

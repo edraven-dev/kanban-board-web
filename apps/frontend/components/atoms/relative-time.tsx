@@ -10,10 +10,7 @@ type RelativeTimeProps = {
   className?: string;
 };
 
-/**
- * Humanized, self-refreshing relative time (e.g. "created 5 minutes ago").
- * Re-renders every 60s so the label stays fresh without a data refetch.
- */
+/** Humanized, self-refreshing relative time (re-renders every 60s). */
 export function RelativeTime({
   date,
   prefix = "created ",

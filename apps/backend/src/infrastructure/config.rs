@@ -112,14 +112,15 @@ mod tests {
 
     #[test]
     fn app_env_is_case_insensitive_and_accepts_short_forms() {
-        let cfg = Config::from_source(source(&[("APP_ENV", "  Prod "), ("DATABASE_URL", "x")]))
-            .unwrap();
+        let cfg =
+            Config::from_source(source(&[("APP_ENV", "  Prod "), ("DATABASE_URL", "x")])).unwrap();
         assert_eq!(cfg.app_env, AppEnv::Production);
     }
 
     #[test]
     fn empty_app_env_falls_back_to_development() {
-        let cfg = Config::from_source(source(&[("APP_ENV", "   "), ("DATABASE_URL", "x")])).unwrap();
+        let cfg =
+            Config::from_source(source(&[("APP_ENV", "   "), ("DATABASE_URL", "x")])).unwrap();
         assert_eq!(cfg.app_env, AppEnv::Development);
     }
 
@@ -144,9 +145,8 @@ mod tests {
 
     #[test]
     fn invalid_port_is_rejected() {
-        let err =
-            Config::from_source(source(&[("DATABASE_URL", "x"), ("PORT", "not-a-port")]))
-                .unwrap_err();
+        let err = Config::from_source(source(&[("DATABASE_URL", "x"), ("PORT", "not-a-port")]))
+            .unwrap_err();
         assert_eq!(err, ConfigError::InvalidPort("not-a-port".to_owned()));
     }
 

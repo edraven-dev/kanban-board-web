@@ -10,7 +10,6 @@ type EmptyStateProps = {
   className?: string;
 };
 
-/** Placeholder shown when an async surface has no data. */
 export function EmptyState({
   title,
   description,

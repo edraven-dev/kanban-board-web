@@ -12,17 +12,11 @@ type EditableTitleProps = {
   label: string;
   maxLength?: number;
   className?: string;
-  /** Start directly in edit mode (e.g. when opened from a menu). */
   autoEdit?: boolean;
-  /** Called when editing ends (after a save or a cancel). */
   onDone?: () => void;
 };
 
-/**
- * Inline-editable label reused for project/board/column names. Click to edit;
- * Enter or blur saves, Esc cancels. Empty/too-long values are rejected with a
- * message instead of saving.
- */
+/** Inline-editable label; click to edit, Enter/blur saves, Esc cancels, rejects empty/too-long. */
 export function EditableTitle({
   value,
   onSave,

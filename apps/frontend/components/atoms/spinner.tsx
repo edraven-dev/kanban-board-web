@@ -7,7 +7,6 @@ type SpinnerProps = {
   className?: string;
 };
 
-/** Accessible loading indicator. */
 export function Spinner({ label = "Loading…", className }: SpinnerProps) {
   return (
     <span role="status" className={cn("inline-flex", className)}>

@@ -3,10 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Card as CardModel } from "@/lib/api/schemas";
 import { cn } from "@/lib/utils";
 
-/**
- * Compact card in a column: the title and a humanized created time only.
- * (Distinct from shadcn's `Card` UI primitive, which it uses internally.)
- */
+/** Compact card: title and humanized created time only. */
 export function CardTile({
   card,
   className,

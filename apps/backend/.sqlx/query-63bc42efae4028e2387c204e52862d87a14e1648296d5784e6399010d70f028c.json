@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id FROM projects WHERE id = $1 FOR UPDATE",
+  "query": "SELECT board_id FROM columns WHERE id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "board_id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "projects",
-            "name": "id"
+            "table": "columns",
+            "name": "board_id"
           }
         }
       }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "71fd198dccf6a501c41fecee90d2bca4e3de89016d9462981899d430528b9fb6"
+  "hash": "63bc42efae4028e2387c204e52862d87a14e1648296d5784e6399010d70f028c"
 }

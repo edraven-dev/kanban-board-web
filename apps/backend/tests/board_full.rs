@@ -5,19 +5,13 @@ use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use axum::response::Response;
 use backend::adapters::outbound::persistence::pg_board_repo::PgBoardRepo;
-use backend::adapters::outbound::persistence::pg_card_repo::PgCardRepo;
-use backend::adapters::outbound::persistence::pg_column_repo::PgColumnRepo;
 use backend::adapters::outbound::persistence::pg_project_repo::PgProjectRepo;
 use backend::app_state::AppState;
 use backend::domain::board::Board;
-use backend::domain::card::Card;
-use backend::domain::column::Column;
 use backend::domain::description::Description;
-use backend::domain::ids::{BoardId, ColumnId};
+use backend::domain::ids::BoardId;
 use backend::domain::name::EntityName;
-use backend::domain::ports::{
-    BoardRepository, CardRepository, ColumnRepository, ProjectRepository,
-};
+use backend::domain::ports::{BoardRepository, ProjectRepository};
 use backend::domain::position::Position;
 use backend::domain::project::Project;
 use backend::domain::title::Title;
@@ -30,8 +24,15 @@ use uuid::Uuid;
 
 async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
     let project = Project::new(EntityName::new("P").unwrap(), Position::new(0).unwrap());
-    PgProjectRepo::new(pool.clone()).insert(&project).await.unwrap();
-    let board = Board::new(project.id, EntityName::new("B").unwrap(), Position::new(0).unwrap());
+    PgProjectRepo::new(pool.clone())
+        .insert(&project)
+        .await
+        .unwrap();
+    let board = Board::new(
+        project.id,
+        EntityName::new("B").unwrap(),
+        Position::new(0).unwrap(),
+    );
     PgBoardRepo::new(pool.clone())
         .insert_within_limit(&board, 99)
         .await
@@ -39,48 +40,38 @@ async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
     board.id
 }
 
-fn column(board: BoardId, name: &str, position: i32) -> Column {
-    Column::new(board, EntityName::new(name).unwrap(), Position::new(position).unwrap())
-}
-
-fn card(column: ColumnId, title: &str, position: i32) -> Card {
-    Card::new(
-        column,
-        Title::new(title).unwrap(),
-        Description::default(),
-        Position::new(position).unwrap(),
-    )
-}
-
 fn app(pool: &sqlx::PgPool) -> Router {
     router(AppEnv::Development, AppState::new(pool.clone()))
 }
 
 fn get(uri: &str) -> Request<Body> {
-    Request::builder().method(Method::GET).uri(uri).body(Body::empty()).unwrap()
+    Request::builder()
+        .method(Method::GET)
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap()
 }
 
 async fn read_json(res: Response) -> Value {
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
 db_test! {
     async fn full_nests_columns_and_cards_ordered_by_position(pool: PgPool) {
         let board = seed_board(&pool).await;
-        let columns = PgColumnRepo::new(pool.clone());
-        let cards = PgCardRepo::new(pool.clone());
+        let repo = PgBoardRepo::new(pool.clone());
 
-        let doing = column(board, "Doing", 1);
-        let todo = column(board, "To Do", 0);
-        let done = column(board, "Done", 2);
-        columns.insert_within_limit(&doing, 99).await.unwrap();
-        columns.insert_within_limit(&todo, 99).await.unwrap();
-        columns.insert_within_limit(&done, 99).await.unwrap();
-
-        cards.insert(&card(todo.id, "A2", 1)).await.unwrap();
-        cards.insert(&card(todo.id, "A1", 0)).await.unwrap();
-        cards.insert(&card(doing.id, "C1", 0)).await.unwrap();
+        let mut aggregate = repo.load(board).await.unwrap().unwrap();
+        let todo = aggregate.add_column(EntityName::new("To Do").unwrap()).unwrap().id;
+        let doing = aggregate.add_column(EntityName::new("Doing").unwrap()).unwrap().id;
+        aggregate.add_column(EntityName::new("Done").unwrap()).unwrap();
+        aggregate.add_card(todo, Title::new("A1").unwrap(), Description::default()).unwrap();
+        aggregate.add_card(todo, Title::new("A2").unwrap(), Description::default()).unwrap();
+        aggregate.add_card(doing, Title::new("C1").unwrap(), Description::default()).unwrap();
+        repo.save(&aggregate).await.unwrap();
 
         let res = app(&pool)
             .oneshot(get(&format!("/api/boards/{}/full", board.as_uuid())))

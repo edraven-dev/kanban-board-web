@@ -14,11 +14,7 @@ type Options<TVars> = {
   errorMessage: string;
 };
 
-/**
- * Optimistic mutation over the nested board-full cache (board → columns → cards):
- * snapshot → apply → persist → roll back and toast on error → refetch on settle.
- * Shared by column mutations and, later, card mutations.
- */
+/** Optimistic mutation over the nested board-full cache: apply → persist → roll back + toast on error. */
 export function useBoardFullMutation<TVars>({
   boardId,
   mutationFn,

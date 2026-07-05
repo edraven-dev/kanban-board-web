@@ -2,11 +2,7 @@
 
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef } from "react";
 
-/**
- * Guards a draggable-and-clickable element: swallows the click the browser
- * fires after a drag (so dragging doesn't also navigate/open). Spread the
- * returned handlers on the element and pass `isDragging` from `useSortable`.
- */
+/** Swallows the click the browser fires after a drag, so dragging doesn't also navigate/open. */
 export function useClickAfterDragGuard(isDragging: boolean) {
   const draggedRef = useRef(false);
 

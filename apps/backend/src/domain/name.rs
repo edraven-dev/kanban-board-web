@@ -48,8 +48,14 @@ mod tests {
 
     #[test]
     fn rejects_a_whitespace_only_name() {
-        assert_eq!(EntityName::new("   \t\n ").unwrap_err(), DomainError::EmptyName);
-        assert_eq!(EntityName::new("").unwrap_err().to_string(), "name must not be empty");
+        assert_eq!(
+            EntityName::new("   \t\n ").unwrap_err(),
+            DomainError::EmptyName
+        );
+        assert_eq!(
+            EntityName::new("").unwrap_err().to_string(),
+            "name must not be empty"
+        );
     }
 
     #[test]
@@ -69,7 +75,10 @@ mod tests {
                 actual: MAX_NAME_LEN + 1,
             },
         );
-        assert_eq!(err.to_string(), "name must be at most 120 characters, got 121");
+        assert_eq!(
+            err.to_string(),
+            "name must be at most 120 characters, got 121"
+        );
     }
 
     #[test]

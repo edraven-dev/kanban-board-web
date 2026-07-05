@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, column_id, title, description, position, created_at, updated_at\n               FROM cards\n               WHERE column_id = $1\n               ORDER BY position, created_at",
+  "query": "SELECT id, column_id, title, description, position, created_at, updated_at\n               FROM cards WHERE column_id = ANY($1) ORDER BY position, created_at",
   "describe": {
     "columns": [
       {
@@ -83,7 +83,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -96,5 +96,5 @@
       false
     ]
   },
-  "hash": "957c0afb1437185ad9af43a83a83eff8dd4dd276cc7500d776ea92664755ef62"
+  "hash": "9df8fab41494278afdd178d5b132b91bdc7e27c29483aee5f1e722feeed5cccd"
 }

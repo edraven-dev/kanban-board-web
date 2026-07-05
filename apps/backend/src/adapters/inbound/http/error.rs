@@ -38,7 +38,11 @@ mod tests {
                 StatusCode::BAD_REQUEST,
                 "validation",
             ),
-            (ApplicationError::NotFound, StatusCode::NOT_FOUND, "not_found"),
+            (
+                ApplicationError::NotFound,
+                StatusCode::NOT_FOUND,
+                "not_found",
+            ),
             (
                 ApplicationError::LimitExceeded,
                 StatusCode::CONFLICT,

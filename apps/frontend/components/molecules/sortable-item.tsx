@@ -14,10 +14,7 @@ type SortableItemProps = {
   className?: string;
 };
 
-/**
- * dnd-kit `useSortable` wrapper with a keyboard-accessible drag handle. One
- * implementation shared by project, board, column, and card reordering.
- */
+/** useSortable wrapper with a keyboard-accessible drag handle. */
 export function SortableItem({
   id,
   children,

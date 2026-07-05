@@ -162,13 +162,19 @@ fn empty_request(method: Method, uri: &str) -> Request<Body> {
 }
 
 async fn read_json(res: Response) -> Value {
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
 async fn create(pool: &sqlx::PgPool, name: &str) -> Value {
     let res = app(pool)
-        .oneshot(json_request(Method::POST, "/api/projects", json!({ "name": name })))
+        .oneshot(json_request(
+            Method::POST,
+            "/api/projects",
+            json!({ "name": name }),
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);

@@ -20,7 +20,6 @@ type ConfirmDeleteDialogProps = {
   onConfirm: () => void;
 };
 
-/** Controlled destructive-confirmation dialog reused for all entity deletes. */
 export function ConfirmDeleteDialog({
   open,
   onOpenChange,
