@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import type { BoardFull, ColumnFull } from "@/lib/api/schemas";
+import type { BoardFull, Card, ColumnFull } from "@/lib/api/schemas";
 import { server } from "@/test/msw/server";
 import { renderWithClient } from "@/test/render";
 
@@ -39,6 +39,10 @@ function boardFull(columns: ColumnFull[]): BoardFull {
 
 function plainColumn(id: string, name: string, position: number) {
   return { id, boardId, name, position, createdAt: ts, updatedAt: ts };
+}
+
+function card(id: string, columnId: string, title: string, position: number): Card {
+  return { id, columnId, title, description: "", position, createdAt: ts, updatedAt: ts };
 }
 
 describe("BoardCanvas", () => {
@@ -206,5 +210,81 @@ describe("BoardCanvas", () => {
     expect(
       screen.queryByRole("button", { name: "Add column" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("creates a card in a column", async () => {
+    const user = userEvent.setup();
+    const cards: Card[] = [];
+    let posted: unknown;
+    server.use(
+      http.get(`${BASE}/boards/${boardId}/full`, () =>
+        HttpResponse.json(boardFull([{ ...column(c1, "To Do", 0), cards }])),
+      ),
+      http.post(`${BASE}/columns/${c1}/cards`, async ({ request }) => {
+        posted = await request.json();
+        const created = card(uid(31), c1, "New Task", cards.length);
+        cards.push(created);
+        return HttpResponse.json(created, { status: 201 });
+      }),
+    );
+
+    renderWithClient(<BoardCanvas boardId={boardId} />);
+    await screen.findByRole("button", { name: "To Do" });
+
+    await user.click(screen.getByRole("button", { name: "Add card" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "New card name" }),
+      "New Task{Enter}",
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "New Task" }),
+    ).toBeInTheDocument();
+    expect(posted).toEqual({ title: "New Task" });
+  });
+
+  it("opens the card modal when a card is clicked", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${BASE}/boards/${boardId}/full`, () =>
+        HttpResponse.json(
+          boardFull([
+            { ...column(c1, "To Do", 0), cards: [card(uid(31), c1, "Task", 0)] },
+          ]),
+        ),
+      ),
+    );
+
+    renderWithClient(<BoardCanvas boardId={boardId} />);
+    await user.click(await screen.findByRole("button", { name: "Task" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Delete card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the card modal via keyboard", async () => {
+    server.use(
+      http.get(`${BASE}/boards/${boardId}/full`, () =>
+        HttpResponse.json(
+          boardFull([
+            { ...column(c1, "To Do", 0), cards: [card(uid(31), c1, "Task", 0)] },
+          ]),
+        ),
+      ),
+    );
+
+    renderWithClient(<BoardCanvas boardId={boardId} />);
+    const cardEl = await screen.findByRole("button", { name: "Task" });
+
+    fireEvent.keyDown(cardEl, { key: "a" });
+    expect(
+      screen.queryByRole("button", { name: "Delete card" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.keyDown(cardEl, { key: " " });
+    expect(
+      await screen.findByRole("button", { name: "Delete card" }),
+    ).toBeInTheDocument();
   });
 });
