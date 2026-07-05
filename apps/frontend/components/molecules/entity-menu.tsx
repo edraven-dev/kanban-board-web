@@ -11,13 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type EntityMenuProps = {
-  /** Accessible name for the trigger, e.g. "Board actions". */
   label: string;
   onRename: () => void;
   onDelete: () => void;
 };
 
-/** Rename/Delete overflow menu reused across projects, boards, and columns. */
 export function EntityMenu({ label, onRename, onDelete }: EntityMenuProps) {
   return (
     <DropdownMenu>

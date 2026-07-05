@@ -1,7 +1,7 @@
 use backend::app_state::AppState;
 use backend::infrastructure::config::Config;
-use backend::infrastructure::telemetry::init_tracing;
 use backend::infrastructure::db;
+use backend::infrastructure::telemetry::init_tracing;
 use backend::router;
 use tokio::net::TcpListener;
 

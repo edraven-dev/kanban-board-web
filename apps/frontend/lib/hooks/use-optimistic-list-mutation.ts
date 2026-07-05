@@ -11,11 +11,7 @@ type Options<TVars, TItem> = {
   errorMessage: string;
 };
 
-/**
- * Shared optimistic mutation for a cached list: snapshot → apply the update
- * immediately → persist → roll back and toast on error → refetch when settled.
- * Reused by rename, delete, and reorder across every entity.
- */
+/** Shared optimistic list mutation: apply → persist → roll back + toast on error. */
 export function useOptimisticListMutation<TVars, TItem>({
   queryKey,
   mutationFn,

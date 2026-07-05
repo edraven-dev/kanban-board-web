@@ -17,7 +17,6 @@ type ProjectSwitcherProps = {
   currentProjectId: string;
 };
 
-/** Header dropdown for switching between projects from inside a project. */
 export function ProjectSwitcher({ currentProjectId }: ProjectSwitcherProps) {
   const { data: projects } = useProjects();
   const current = projects?.find((project) => project.id === currentProjectId);

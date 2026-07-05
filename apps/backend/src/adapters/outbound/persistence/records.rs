@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::domain::board::Board;
+use crate::domain::board::BoardSummary;
 use crate::domain::card::Card;
 use crate::domain::column::Column;
 use crate::domain::description::Description;
@@ -44,11 +44,11 @@ pub struct BoardRecord {
     pub updated_at: DateTime<Utc>,
 }
 
-impl TryFrom<BoardRecord> for Board {
+impl TryFrom<BoardRecord> for BoardSummary {
     type Error = RepositoryError;
 
     fn try_from(record: BoardRecord) -> Result<Self, Self::Error> {
-        Ok(Board {
+        Ok(BoardSummary {
             id: BoardId::from_uuid(record.id),
             project_id: ProjectId::from_uuid(record.project_id),
             name: EntityName::new(record.name).map_err(|e| RepositoryError::new(e.to_string()))?,
@@ -81,6 +81,7 @@ impl TryFrom<ColumnRecord> for Column {
                 .map_err(|e| RepositoryError::new(e.to_string()))?,
             created_at: record.created_at,
             updated_at: record.updated_at,
+            cards: Vec::new(),
         })
     }
 }

@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id FROM columns WHERE id = $1 FOR UPDATE",
+  "query": "SELECT col.board_id\n               FROM cards c JOIN columns col ON col.id = c.column_id\n               WHERE c.id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "board_id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
             "table": "columns",
-            "name": "id"
+            "name": "board_id"
           }
         }
       }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "3eed2e9133d61c49901ff1c90af1b561ca4ded9a19af70087a166c762abea6f9"
+  "hash": "2b28969ae9692514d593670b0947803437c6ddd3bd83c72a000d5261caa6e7bd"
 }

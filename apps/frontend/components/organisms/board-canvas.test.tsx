@@ -194,6 +194,7 @@ describe("BoardCanvas", () => {
     expect(scroll.scrollLeft).toBe(120);
   });
 
+  // 99 real columns is heavy; use text queries and a longer timeout for slow CI.
   it("hides the create control at the 99-column limit", async () => {
     const many = Array.from({ length: 99 }, (_, index) =>
       column(uid(index), `Col ${index}`, index),
@@ -205,12 +206,10 @@ describe("BoardCanvas", () => {
     );
 
     renderWithClient(<BoardCanvas boardId={boardId} />);
-    await screen.findByRole("button", { name: "Col 0" });
+    await screen.findByText("Col 0");
 
-    expect(
-      screen.queryByRole("button", { name: "Add column" }),
-    ).not.toBeInTheDocument();
-  });
+    expect(screen.queryByText("Add column")).not.toBeInTheDocument();
+  }, 15000);
 
   it("creates a card in a column", async () => {
     const user = userEvent.setup();

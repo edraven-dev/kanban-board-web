@@ -2,10 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-/**
- * Responsive tile grid — column count scales with viewport width. Reused for
- * the project chooser and, later, a project's board list.
- */
+/** Responsive tile grid; column count scales with viewport width. */
 export function TileGrid({
   children,
   className,

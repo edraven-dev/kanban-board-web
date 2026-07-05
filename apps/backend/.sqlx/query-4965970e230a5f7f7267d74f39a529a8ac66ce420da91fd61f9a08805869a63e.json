@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO cards\n                         (id, column_id, title, description, position, created_at, updated_at)\n                       VALUES ($1, $2, $3, $4, $5, $6, $7)\n                       ON CONFLICT (id) DO UPDATE\n                         SET column_id = EXCLUDED.column_id,\n                             title = EXCLUDED.title,\n                             description = EXCLUDED.description,\n                             position = EXCLUDED.position,\n                             updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4965970e230a5f7f7267d74f39a529a8ac66ce420da91fd61f9a08805869a63e"
+}

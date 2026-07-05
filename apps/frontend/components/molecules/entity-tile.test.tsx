@@ -47,7 +47,6 @@ describe("EntityTile", () => {
     await user.type(input, "Renamed{Enter}");
 
     expect(onRename).toHaveBeenCalledExactlyOnceWith("Renamed");
-    // Editing closed → the link is shown again.
     expect(
       await screen.findByRole("link", { name: "Open Alpha" }),
     ).toBeInTheDocument();

@@ -5,23 +5,14 @@ use axum::body::Body;
 use axum::http::{Method, Request, StatusCode, header};
 use axum::response::Response;
 use backend::adapters::outbound::persistence::pg_board_repo::PgBoardRepo;
-use backend::adapters::outbound::persistence::pg_card_repo::PgCardRepo;
-use backend::adapters::outbound::persistence::pg_column_repo::PgColumnRepo;
 use backend::adapters::outbound::persistence::pg_project_repo::PgProjectRepo;
 use backend::app_state::AppState;
 use backend::domain::board::Board;
-use backend::domain::card::Card;
-use backend::domain::column::Column;
-use backend::domain::description::Description;
-use backend::domain::ids::{CardId, ColumnId};
+use backend::domain::ids::ColumnId;
 use backend::domain::name::EntityName;
-use backend::domain::ports::{
-    BoardRepository, CardRepository, ColumnRepository, InsertOutcome, MoveOutcome,
-    ProjectRepository,
-};
+use backend::domain::ports::{BoardRepository, ProjectRepository};
 use backend::domain::position::Position;
 use backend::domain::project::Project;
-use backend::domain::title::Title;
 use backend::infrastructure::config::AppEnv;
 use backend::router;
 use common::db_test;
@@ -31,218 +22,25 @@ use uuid::Uuid;
 
 async fn seed_column(pool: &sqlx::PgPool) -> ColumnId {
     let project = Project::new(EntityName::new("P").unwrap(), Position::new(0).unwrap());
-    PgProjectRepo::new(pool.clone()).insert(&project).await.unwrap();
-    let board = Board::new(project.id, EntityName::new("B").unwrap(), Position::new(0).unwrap());
-    PgBoardRepo::new(pool.clone())
-        .insert_within_limit(&board, 99)
+    PgProjectRepo::new(pool.clone())
+        .insert(&project)
         .await
         .unwrap();
-    let column = Column::new(board.id, EntityName::new("C").unwrap(), Position::new(0).unwrap());
-    PgColumnRepo::new(pool.clone())
-        .insert_within_limit(&column, 99)
-        .await
-        .unwrap();
-    column.id
-}
-
-fn card(column: ColumnId, title: &str, description: &str, position: i32) -> Card {
-    Card::new(
-        column,
-        Title::new(title).unwrap(),
-        Description::new(description).unwrap(),
-        Position::new(position).unwrap(),
-    )
-}
-
-async fn titles(repo: &PgCardRepo, column: ColumnId) -> Vec<String> {
-    repo.list_by_column(column)
-        .await
+    let board = Board::new(
+        project.id,
+        EntityName::new("B").unwrap(),
+        Position::new(0).unwrap(),
+    );
+    let repo = PgBoardRepo::new(pool.clone());
+    repo.insert_within_limit(&board, 99).await.unwrap();
+    let mut aggregate = repo.load(board.id).await.unwrap().unwrap();
+    let column_id = aggregate
+        .add_column(EntityName::new("C").unwrap())
         .unwrap()
-        .iter()
-        .map(|c| c.title.as_str().to_owned())
-        .collect()
+        .id;
+    repo.save(&aggregate).await.unwrap();
+    column_id
 }
-
-// ---------------------------------------------------------------------------
-// Repository tests
-// ---------------------------------------------------------------------------
-
-db_test! {
-    async fn insert_creates_and_round_trips(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let c = card(column, "Ship it", "with details", 0);
-
-        assert_eq!(repo.insert(&c).await.unwrap(), InsertOutcome::Inserted);
-        let fetched = repo.get(c.id).await.unwrap().unwrap();
-        assert_eq!(fetched.title.as_str(), "Ship it");
-        assert_eq!(fetched.description.as_str(), "with details");
-        assert_eq!(fetched.column_id, column);
-    }
-}
-
-db_test! {
-    async fn insert_under_a_missing_column_is_parent_missing(pool: PgPool) {
-        let repo = PgCardRepo::new(pool);
-        let c = card(ColumnId::new(), "orphan", "", 0);
-        assert_eq!(repo.insert(&c).await.unwrap(), InsertOutcome::ParentMissing);
-    }
-}
-
-db_test! {
-    async fn list_is_scoped_to_the_column_and_ordered(pool: PgPool) {
-        let repo = PgCardRepo::new(pool.clone());
-        let a = seed_column(&pool).await;
-        let b = seed_column(&pool).await;
-        repo.insert(&card(a, "A2", "", 2)).await.unwrap();
-        repo.insert(&card(a, "A0", "", 0)).await.unwrap();
-        repo.insert(&card(b, "B0", "", 0)).await.unwrap();
-
-        assert_eq!(titles(&repo, a).await, ["A0", "A2"]);
-    }
-}
-
-db_test! {
-    async fn get_of_a_missing_card_is_none(pool: PgPool) {
-        let repo = PgCardRepo::new(pool);
-        assert!(repo.get(CardId::new()).await.unwrap().is_none());
-    }
-}
-
-db_test! {
-    async fn update_changes_fields_and_preserves_created_at(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let c = card(column, "Old", "old body", 0);
-        repo.insert(&c).await.unwrap();
-        let created_at = repo.get(c.id).await.unwrap().unwrap().created_at;
-
-        repo.update(c.id, Title::new("New").unwrap(), Description::new("new body").unwrap())
-            .await
-            .unwrap();
-
-        let fetched = repo.get(c.id).await.unwrap().unwrap();
-        assert_eq!(fetched.title.as_str(), "New");
-        assert_eq!(fetched.description.as_str(), "new body");
-        assert_eq!(fetched.created_at, created_at);
-        assert!(fetched.updated_at >= created_at);
-    }
-}
-
-db_test! {
-    async fn delete_removes_the_row(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let c = card(column, "Gone", "", 0);
-        repo.insert(&c).await.unwrap();
-        repo.delete(c.id).await.unwrap();
-        assert!(repo.get(c.id).await.unwrap().is_none());
-    }
-}
-
-db_test! {
-    async fn move_within_a_column_rewrites_positions(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let (a, b, c) = (card(column, "A", "", 0), card(column, "B", "", 1), card(column, "C", "", 2));
-        for x in [&a, &b, &c] {
-            repo.insert(x).await.unwrap();
-        }
-
-        assert_eq!(repo.move_card(a.id, column, 2).await.unwrap(), MoveOutcome::Moved);
-        assert_eq!(titles(&repo, column).await, ["B", "C", "A"]);
-
-        let positions: Vec<i32> = repo
-            .list_by_column(column)
-            .await
-            .unwrap()
-            .iter()
-            .map(|c| c.position.value())
-            .collect();
-        assert_eq!(positions, [0, 1, 2]);
-    }
-}
-
-db_test! {
-    async fn move_across_columns_moves_and_reseqs_both_sides(pool: PgPool) {
-        let src = seed_column(&pool).await;
-        let dst = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let a = card(src, "A", "", 0);
-        repo.insert(&a).await.unwrap();
-        repo.insert(&card(dst, "X", "", 0)).await.unwrap();
-        repo.insert(&card(dst, "Y", "", 1)).await.unwrap();
-
-        assert_eq!(repo.move_card(a.id, dst, 1).await.unwrap(), MoveOutcome::Moved);
-
-        assert!(titles(&repo, src).await.is_empty());
-        assert_eq!(titles(&repo, dst).await, ["X", "A", "Y"]);
-        assert_eq!(repo.get(a.id).await.unwrap().unwrap().column_id, dst);
-    }
-}
-
-db_test! {
-    async fn move_of_a_missing_card_is_card_missing(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        assert_eq!(
-            repo.move_card(CardId::new(), column, 0).await.unwrap(),
-            MoveOutcome::CardMissing
-        );
-    }
-}
-
-db_test! {
-    async fn move_to_a_missing_target_is_target_missing(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let c = card(column, "A", "", 0);
-        repo.insert(&c).await.unwrap();
-        assert_eq!(
-            repo.move_card(c.id, ColumnId::new(), 0).await.unwrap(),
-            MoveOutcome::TargetMissing
-        );
-    }
-}
-
-db_test! {
-    async fn deleting_a_column_cascades_to_its_cards(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool.clone());
-        repo.insert(&card(column, "A", "", 0)).await.unwrap();
-
-        PgColumnRepo::new(pool.clone()).delete(column).await.unwrap();
-        assert!(repo.list_by_column(column).await.unwrap().is_empty());
-    }
-}
-
-db_test! {
-    async fn a_driver_error_becomes_a_repository_error(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        let repo = PgCardRepo::new(pool);
-        let c = card(column, "Dup", "", 0);
-        repo.insert(&c).await.unwrap();
-        let err = repo.insert(&c).await.unwrap_err();
-        assert!(err.to_string().contains("repository error"));
-    }
-}
-
-db_test! {
-    async fn a_row_violating_the_title_rule_fails_to_map(pool: PgPool) {
-        let column = seed_column(&pool).await;
-        sqlx::query("INSERT INTO cards (id, column_id, title, position) VALUES ($1, $2, '', 0)")
-            .bind(Uuid::now_v7())
-            .bind(column.as_uuid())
-            .execute(&pool)
-            .await
-            .unwrap();
-        assert!(PgCardRepo::new(pool).list_by_column(column).await.is_err());
-    }
-}
-
-// ---------------------------------------------------------------------------
-// HTTP handler tests
-// ---------------------------------------------------------------------------
 
 fn app(pool: &sqlx::PgPool) -> Router {
     router(AppEnv::Development, AppState::new(pool.clone()))
@@ -266,7 +64,9 @@ fn empty_request(method: Method, uri: &str) -> Request<Body> {
 }
 
 async fn read_json(res: Response) -> Value {
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 

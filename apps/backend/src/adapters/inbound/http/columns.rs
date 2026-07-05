@@ -19,8 +19,13 @@ pub async fn list(
     State(state): State<AppState>,
     Path(board_id): Path<Uuid>,
 ) -> Result<Json<Vec<ColumnResponse>>, ApplicationError> {
-    let columns = state.columns.list(BoardId::from_uuid(board_id)).await?;
-    Ok(Json(columns.into_iter().map(ColumnResponse::from).collect()))
+    let columns = state
+        .boards
+        .list_columns(BoardId::from_uuid(board_id))
+        .await?;
+    Ok(Json(
+        columns.into_iter().map(ColumnResponse::from).collect(),
+    ))
 }
 
 #[utoipa::path(
@@ -38,8 +43,8 @@ pub async fn create(
     Json(body): Json<CreateColumnRequest>,
 ) -> Result<(StatusCode, Json<ColumnResponse>), ApplicationError> {
     let column = state
-        .columns
-        .create(BoardId::from_uuid(board_id), &body.name)
+        .boards
+        .create_column(BoardId::from_uuid(board_id), &body.name)
         .await?;
     Ok((StatusCode::CREATED, Json(column.into())))
 }
@@ -55,7 +60,10 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateColumnRequest>,
 ) -> Result<Json<ColumnResponse>, ApplicationError> {
-    let column = state.columns.update(ColumnId::from_uuid(id), &body.name).await?;
+    let column = state
+        .boards
+        .rename_column(ColumnId::from_uuid(id), &body.name)
+        .await?;
     Ok(Json(column.into()))
 }
 
@@ -68,7 +76,7 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApplicationError> {
-    state.columns.delete(ColumnId::from_uuid(id)).await?;
+    state.boards.delete_column(ColumnId::from_uuid(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -83,10 +91,14 @@ pub async fn reorder(
     Path(board_id): Path<Uuid>,
     Json(body): Json<ReorderRequest>,
 ) -> Result<StatusCode, ApplicationError> {
-    let ids = body.ordered_ids.into_iter().map(ColumnId::from_uuid).collect();
+    let ids = body
+        .ordered_ids
+        .into_iter()
+        .map(ColumnId::from_uuid)
+        .collect();
     state
-        .columns
-        .reorder(BoardId::from_uuid(board_id), ids)
+        .boards
+        .reorder_columns(BoardId::from_uuid(board_id), ids)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -44,7 +44,10 @@ mod tests {
     #[test]
     fn rejects_an_empty_title() {
         assert_eq!(Title::new("   ").unwrap_err(), DomainError::EmptyTitle);
-        assert_eq!(Title::new("").unwrap_err().to_string(), "title must not be empty");
+        assert_eq!(
+            Title::new("").unwrap_err().to_string(),
+            "title must not be empty"
+        );
     }
 
     #[test]
@@ -64,6 +67,9 @@ mod tests {
                 actual: MAX_TITLE_LEN + 1,
             },
         );
-        assert_eq!(err.to_string(), "title must be at most 200 characters, got 201");
+        assert_eq!(
+            err.to_string(),
+            "title must be at most 200 characters, got 201"
+        );
     }
 }
