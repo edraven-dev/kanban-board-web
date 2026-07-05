@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   closestCenter,
   DndContext,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -12,9 +13,11 @@ import {
   type AnimateLayoutChanges,
   rectSortingStrategy,
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { GripVerticalIcon } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/molecules/confirm-delete-dialog";
 import { EntityTile } from "@/components/molecules/entity-tile";
@@ -58,8 +61,12 @@ export function SortableTileGrid<T extends TileItem>({
   const reorder = useReorder<T>(queryKey, reorderPersist);
 
   // Distance constraint so a tap opens the tile and only a drag reorders it.
+  // Keyboard sensor drives reordering from the tile's drag handle.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   return (
@@ -127,8 +134,15 @@ function SortableTile({
   onDelete,
 }: SortableTileProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const { setNodeRef, listeners, transform, transition, isDragging } =
-    useSortable({ id, animateLayoutChanges: noLayoutAnimation });
+  const {
+    setNodeRef,
+    setActivatorNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, animateLayoutChanges: noLayoutAnimation });
   const clickGuard = useClickAfterDragGuard(isDragging);
 
   const style = {
@@ -143,9 +157,20 @@ function SortableTile({
         ref={setNodeRef}
         style={style}
         {...listeners}
-        className="touch-none"
+        className="group/tile relative touch-none"
         {...clickGuard}
       >
+        {/* Keyboard-accessible drag handle; pointer users can drag the whole tile. */}
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={`Reorder ${name}`}
+          className="absolute left-1.5 top-1.5 z-10 cursor-grab touch-none rounded text-neutral-900 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVerticalIcon className="size-4" />
+        </button>
         <EntityTile
           name={name}
           seed={id}

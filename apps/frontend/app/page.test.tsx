@@ -39,6 +39,10 @@ describe("Home (projects feature)", () => {
       "href",
       `/projects/${betaId}`,
     );
+    // Each tile exposes a keyboard-accessible reorder handle.
+    expect(
+      screen.getByRole("button", { name: "Reorder Alpha" }),
+    ).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no projects", async () => {
