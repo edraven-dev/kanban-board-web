@@ -79,6 +79,17 @@ pnpm --filter backend dev   # or: cargo run
 - `APP_ENV=production` adds **no** CORS layer — production is served same-origin
   under `host.com/api`.
 
+## Seed (dev only)
+
+```bash
+pnpm --filter backend seed   # or: cargo run --bin seed
+```
+
+Populates a demo project (two boards, six columns, ten cards with staggered
+`created_at`s to showcase "created N ago"). It is **idempotent** — re-running
+replaces the demo project in place rather than duplicating it — and **refuses to
+run** unless `APP_ENV=development`.
+
 ## Migrations
 
 SQL migrations live in `migrations/` (timestamped `<YYYYMMDDHHMMSS>_<name>.sql`) and
