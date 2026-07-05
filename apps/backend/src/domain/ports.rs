@@ -60,9 +60,10 @@ pub trait BoardRepository: Send + Sync {
     async fn reorder(&self, project_id: ProjectId, ordered_ids: &[BoardId]) -> RepoResult<()>;
 }
 
-/// Checks a project by id without reading the Project aggregate's tables.
+/// The Project aggregate's public interface (its API) for other aggregates:
+/// check a project by id without reading the Project aggregate's tables.
 #[async_trait]
-pub trait ProjectDirectory: Send + Sync {
+pub trait ProjectApi: Send + Sync {
     async fn exists(&self, id: ProjectId) -> RepoResult<bool>;
 }
 
@@ -81,6 +82,6 @@ mod tests {
         fn assert_dyn<T: ?Sized>() {}
         assert_dyn::<dyn ProjectRepository>();
         assert_dyn::<dyn BoardRepository>();
-        assert_dyn::<dyn ProjectDirectory>();
+        assert_dyn::<dyn ProjectApi>();
     }
 }

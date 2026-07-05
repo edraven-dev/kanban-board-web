@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use crate::adapters::outbound::persistence::pg_board_repo::PgBoardRepo;
 use crate::adapters::outbound::persistence::pg_project_repo::PgProjectRepo;
 use crate::application::board_service::BoardService;
-use crate::application::project_directory::ProjectDirectoryService;
+use crate::application::project_gateway::ProjectApiGateway;
 use crate::application::project_service::ProjectService;
 
 #[derive(Clone)]
@@ -20,10 +20,10 @@ impl AppState {
         let project_repo = Arc::new(PgProjectRepo::new(pool.clone()));
         let board_repo = Arc::new(PgBoardRepo::new(pool.clone()));
 
-        let directory = Arc::new(ProjectDirectoryService::new(project_repo.clone()));
+        let gateway = Arc::new(ProjectApiGateway::new(project_repo.clone()));
 
         let projects = ProjectService::new(project_repo);
-        let boards = BoardService::new(board_repo, directory);
+        let boards = BoardService::new(board_repo, gateway);
         Self {
             pool,
             projects,

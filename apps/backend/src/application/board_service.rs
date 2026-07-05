@@ -8,7 +8,7 @@ use crate::domain::column::Column;
 use crate::domain::description::Description;
 use crate::domain::ids::{BoardId, CardId, ColumnId, ProjectId};
 use crate::domain::name::EntityName;
-use crate::domain::ports::{BoardRepository, LimitedInsert, ProjectDirectory};
+use crate::domain::ports::{BoardRepository, LimitedInsert, ProjectApi};
 use crate::domain::position::Position;
 use crate::domain::title::Title;
 
@@ -18,11 +18,11 @@ pub const MAX_BOARDS_PER_PROJECT: i64 = 99;
 #[derive(Clone)]
 pub struct BoardService {
     boards: Arc<dyn BoardRepository>,
-    projects: Arc<dyn ProjectDirectory>,
+    projects: Arc<dyn ProjectApi>,
 }
 
 impl BoardService {
-    pub fn new(boards: Arc<dyn BoardRepository>, projects: Arc<dyn ProjectDirectory>) -> Self {
+    pub fn new(boards: Arc<dyn BoardRepository>, projects: Arc<dyn ProjectApi>) -> Self {
         Self { boards, projects }
     }
 
@@ -408,11 +408,11 @@ mod tests {
         }
     }
 
-    struct FakeDirectory {
+    struct FakeProjectApi {
         present: bool,
     }
 
-    impl FakeDirectory {
+    impl FakeProjectApi {
         fn present() -> Arc<Self> {
             Arc::new(Self { present: true })
         }
@@ -422,19 +422,19 @@ mod tests {
     }
 
     #[async_trait]
-    impl ProjectDirectory for FakeDirectory {
+    impl ProjectApi for FakeProjectApi {
         async fn exists(&self, _id: ProjectId) -> RepoResult<bool> {
             Ok(self.present)
         }
     }
 
-    fn service(repo: Arc<FakeBoardRepo>, directory: Arc<FakeDirectory>) -> BoardService {
-        BoardService::new(repo, directory)
+    fn service(repo: Arc<FakeBoardRepo>, projects: Arc<FakeProjectApi>) -> BoardService {
+        BoardService::new(repo, projects)
     }
 
     async fn board_with_column() -> (BoardService, Arc<FakeBoardRepo>, BoardId, ColumnId) {
         let repo = FakeBoardRepo::new();
-        let svc = service(repo.clone(), FakeDirectory::present());
+        let svc = service(repo.clone(), FakeProjectApi::present());
         let project = ProjectId::new();
         let board = svc.create(project, "B").await.unwrap();
         let column = svc.create_column(board.id(), "To Do").await.unwrap();
@@ -444,7 +444,7 @@ mod tests {
     #[tokio::test]
     async fn create_appends_and_rejects_blank_name_missing_project_and_limit() {
         let repo = FakeBoardRepo::new();
-        let svc = service(repo.clone(), FakeDirectory::present());
+        let svc = service(repo.clone(), FakeProjectApi::present());
         let project = ProjectId::new();
 
         let first = svc.create(project, "A").await.unwrap();
@@ -460,7 +460,7 @@ mod tests {
             ApplicationError::Domain(DomainError::EmptyName)
         ));
 
-        let absent = service(FakeBoardRepo::new(), FakeDirectory::absent());
+        let absent = service(FakeBoardRepo::new(), FakeProjectApi::absent());
         assert!(matches!(
             absent.create(ProjectId::new(), "X").await.unwrap_err(),
             ApplicationError::NotFound
@@ -469,7 +469,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_enforces_the_per_project_limit() {
-        let svc = service(FakeBoardRepo::new(), FakeDirectory::present());
+        let svc = service(FakeBoardRepo::new(), FakeProjectApi::present());
         let full = ProjectId::new();
         for i in 0..MAX_BOARDS_PER_PROJECT {
             svc.create(full, &format!("B{i}")).await.unwrap();
@@ -483,7 +483,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_surfaces_repository_errors() {
-        let svc = service(FakeBoardRepo::failing(), FakeDirectory::present());
+        let svc = service(FakeBoardRepo::failing(), FakeProjectApi::present());
         assert!(matches!(
             svc.create(ProjectId::new(), "x").await.unwrap_err(),
             ApplicationError::Repository(_)
@@ -493,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn update_and_delete_and_missing_are_handled() {
         let repo = FakeBoardRepo::new();
-        let svc = service(repo.clone(), FakeDirectory::present());
+        let svc = service(repo.clone(), FakeProjectApi::present());
         let board = svc.create(ProjectId::new(), "Old").await.unwrap();
 
         assert_eq!(
@@ -514,7 +514,7 @@ mod tests {
 
     #[tokio::test]
     async fn reorder_permutes_or_rejects() {
-        let svc = service(FakeBoardRepo::new(), FakeDirectory::present());
+        let svc = service(FakeBoardRepo::new(), FakeProjectApi::present());
         let project = ProjectId::new();
         let a = svc.create(project, "A").await.unwrap().id();
         let b = svc.create(project, "B").await.unwrap().id();
@@ -676,7 +676,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_columns_and_cards_are_empty_for_missing_parents() {
-        let svc = service(FakeBoardRepo::new(), FakeDirectory::present());
+        let svc = service(FakeBoardRepo::new(), FakeProjectApi::present());
         assert!(svc.list_columns(BoardId::new()).await.unwrap().is_empty());
         assert!(svc.list_cards(ColumnId::new()).await.unwrap().is_empty());
         assert!(svc.get_full(BoardId::new()).await.unwrap().is_none());

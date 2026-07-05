@@ -3,22 +3,21 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::domain::ids::ProjectId;
-use crate::domain::ports::{ProjectDirectory, ProjectRepository, RepoResult};
+use crate::domain::ports::{ProjectApi, ProjectRepository, RepoResult};
 
-/// Backs [`ProjectDirectory`] with the Project repo; across a service split, an API call.
 #[derive(Clone)]
-pub struct ProjectDirectoryService {
+pub struct ProjectApiGateway {
     projects: Arc<dyn ProjectRepository>,
 }
 
-impl ProjectDirectoryService {
+impl ProjectApiGateway {
     pub fn new(projects: Arc<dyn ProjectRepository>) -> Self {
         Self { projects }
     }
 }
 
 #[async_trait]
-impl ProjectDirectory for ProjectDirectoryService {
+impl ProjectApi for ProjectApiGateway {
     async fn exists(&self, id: ProjectId) -> RepoResult<bool> {
         Ok(self.projects.get(id).await?.is_some())
     }
@@ -68,11 +67,11 @@ mod tests {
     async fn reports_whether_a_project_exists() {
         let project = Project::new(EntityName::new("P").unwrap(), Position::new(0).unwrap());
         let id = project.id();
-        let directory = ProjectDirectoryService::new(Arc::new(FakeProjectRepo {
+        let gateway = ProjectApiGateway::new(Arc::new(FakeProjectRepo {
             rows: Mutex::new(vec![project]),
         }));
 
-        assert!(directory.exists(id).await.unwrap());
-        assert!(!directory.exists(ProjectId::new()).await.unwrap());
+        assert!(gateway.exists(id).await.unwrap());
+        assert!(!gateway.exists(ProjectId::new()).await.unwrap());
     }
 }
