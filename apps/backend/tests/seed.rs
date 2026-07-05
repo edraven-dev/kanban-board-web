@@ -14,12 +14,16 @@ async fn db_counts(projects: &PgProjectRepo, boards: &PgBoardRepo) -> (usize, us
     let mut columns = 0;
     let mut cards = 0;
     for project in &project_rows {
-        let summaries = boards.list_by_project(project.id).await.unwrap();
+        let summaries = boards.list_by_project(project.id()).await.unwrap();
         board_count += summaries.len();
         for summary in &summaries {
-            let board = boards.load(summary.id).await.unwrap().unwrap();
-            columns += board.columns.len();
-            cards += board.columns.iter().map(|c| c.cards.len()).sum::<usize>();
+            let board = boards.load(summary.id()).await.unwrap().unwrap();
+            columns += board.columns().len();
+            cards += board
+                .columns()
+                .iter()
+                .map(|c| c.cards().len())
+                .sum::<usize>();
         }
     }
     (project_rows.len(), board_count, columns, cards)
@@ -38,15 +42,15 @@ db_test! {
 
         // Cards are staggered into the past to showcase relative times.
         let demo = &boards
-            .list_by_project(projects.list().await.unwrap()[0].id)
+            .list_by_project(projects.list().await.unwrap()[0].id())
             .await
             .unwrap()[0];
-        let board = boards.load(demo.id).await.unwrap().unwrap();
+        let board = boards.load(demo.id()).await.unwrap().unwrap();
         let timestamps: Vec<_> = board
-            .columns
+            .columns()
             .iter()
-            .flat_map(|c| &c.cards)
-            .map(|card| card.created_at)
+            .flat_map(|c| c.cards())
+            .map(|card| card.created_at())
             .collect();
         let distinct = timestamps.iter().collect::<std::collections::HashSet<_>>();
         assert!(distinct.len() > 1, "expected varied created_at values");

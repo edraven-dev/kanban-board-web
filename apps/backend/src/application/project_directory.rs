@@ -47,7 +47,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|p| p.id == id)
+                .find(|p| p.id() == id)
                 .cloned())
         }
         async fn insert(&self, _project: &Project) -> RepoResult<()> {
@@ -67,7 +67,7 @@ mod tests {
     #[tokio::test]
     async fn reports_whether_a_project_exists() {
         let project = Project::new(EntityName::new("P").unwrap(), Position::new(0).unwrap());
-        let id = project.id;
+        let id = project.id();
         let directory = ProjectDirectoryService::new(Arc::new(FakeProjectRepo {
             rows: Mutex::new(vec![project]),
         }));

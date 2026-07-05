@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::board::{Board, BoardSummary};
+use crate::domain::error::DomainError;
 use crate::domain::ids::{BoardId, CardId, ColumnId, ProjectId};
 use crate::domain::name::EntityName;
 use crate::domain::project::Project;
@@ -17,6 +18,12 @@ impl RepositoryError {
         Self {
             message: message.into(),
         }
+    }
+}
+
+impl From<DomainError> for RepositoryError {
+    fn from(error: DomainError) -> Self {
+        Self::new(error.to_string())
     }
 }
 

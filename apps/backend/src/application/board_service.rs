@@ -39,21 +39,20 @@ impl BoardService {
         if !self.projects.exists(project_id).await? {
             return Err(ApplicationError::NotFound);
         }
-        let next = self
-            .boards
-            .list_by_project(project_id)
-            .await?
-            .iter()
-            .map(|b| b.position.value())
-            .max()
-            .map_or(0, |max| max + 1);
-        let board = Board::new(project_id, name, Position::new(next)?);
+        // Position is a placeholder; the repository assigns it atomically at insert.
+        let board = Board::new(project_id, name, Position::new(0)?);
         match self
             .boards
             .insert_within_limit(&board, MAX_BOARDS_PER_PROJECT)
             .await?
         {
-            LimitedInsert::Created => Ok(board.to_summary()),
+            // The position is assigned by the repository under its per-project lock,
+            // so read it back rather than trusting the in-memory board.
+            LimitedInsert::Created => self
+                .boards
+                .summary(board.id())
+                .await?
+                .ok_or(ApplicationError::NotFound),
             LimitedInsert::LimitReached => Err(ApplicationError::LimitExceeded),
         }
     }
@@ -85,7 +84,7 @@ impl BoardService {
             .list_by_project(project_id)
             .await?
             .into_iter()
-            .map(|b| b.id)
+            .map(|b| b.id())
             .collect();
         ensure_permutation(&existing, &ordered_ids)?;
         self.boards.reorder(project_id, &ordered_ids).await?;
@@ -101,7 +100,7 @@ impl BoardService {
             .boards
             .load(board_id)
             .await?
-            .map(|b| b.columns)
+            .map(Board::into_columns)
             .unwrap_or_default())
     }
 
@@ -169,7 +168,7 @@ impl BoardService {
         };
         Ok(board
             .column(column_id)
-            .map(|c| c.cards.clone())
+            .map(|c| c.cards().to_vec())
             .unwrap_or_default())
     }
 
@@ -294,10 +293,10 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|b| b.project_id == project_id)
+                .filter(|b| b.project_id() == project_id)
                 .map(|b| b.to_summary())
                 .collect();
-            rows.sort_by_key(|b| b.position.value());
+            rows.sort_by_key(|b| b.position().value());
             Ok(rows)
         }
 
@@ -307,7 +306,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|b| b.id == id)
+                .find(|b| b.id() == id)
                 .map(|b| b.to_summary()))
         }
 
@@ -320,7 +319,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|b| b.id == id)
+                .find(|b| b.id() == id)
                 .cloned())
         }
 
@@ -330,7 +329,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|b| b.columns.iter().any(|c| c.id == column_id))
+                .find(|b| b.columns().iter().any(|c| c.id() == column_id))
                 .cloned())
         }
 
@@ -341,44 +340,57 @@ mod tests {
                 .unwrap()
                 .iter()
                 .find(|b| {
-                    b.columns
+                    b.columns()
                         .iter()
-                        .flat_map(|c| c.cards.iter())
-                        .any(|c| c.id == card_id)
+                        .flat_map(|c| c.cards().iter())
+                        .any(|c| c.id() == card_id)
                 })
                 .cloned())
         }
 
         async fn insert_within_limit(&self, board: &Board, max: i64) -> RepoResult<LimitedInsert> {
+            if self.fail {
+                return Err(RepositoryError::new("boom"));
+            }
             let mut rows = self.boards.lock().unwrap();
-            let count = rows
+            let positions: Vec<i32> = rows
                 .iter()
-                .filter(|b| b.project_id == board.project_id)
-                .count() as i64;
-            if count >= max {
+                .filter(|b| b.project_id() == board.project_id())
+                .map(|b| b.position().value())
+                .collect();
+            if positions.len() as i64 >= max {
                 return Ok(LimitedInsert::LimitReached);
             }
-            rows.push(board.clone());
+            let next = positions.iter().max().map_or(0, |m| m + 1);
+            let mut stored = board.clone();
+            stored.reposition(Position::new(next).unwrap());
+            rows.push(stored);
             Ok(LimitedInsert::Created)
         }
 
         async fn save(&self, board: &Board) -> RepoResult<()> {
             let mut rows = self.boards.lock().unwrap();
-            if let Some(slot) = rows.iter_mut().find(|b| b.id == board.id) {
+            if let Some(slot) = rows.iter_mut().find(|b| b.id() == board.id()) {
                 *slot = board.clone();
             }
             Ok(())
         }
 
         async fn update(&self, id: BoardId, name: EntityName) -> RepoResult<()> {
-            if let Some(b) = self.boards.lock().unwrap().iter_mut().find(|b| b.id == id) {
-                b.name = name;
+            if let Some(b) = self
+                .boards
+                .lock()
+                .unwrap()
+                .iter_mut()
+                .find(|b| b.id() == id)
+            {
+                b.rename(name);
             }
             Ok(())
         }
 
         async fn delete(&self, id: BoardId) -> RepoResult<()> {
-            self.boards.lock().unwrap().retain(|b| b.id != id);
+            self.boards.lock().unwrap().retain(|b| b.id() != id);
             Ok(())
         }
 
@@ -387,9 +399,9 @@ mod tests {
             for (index, id) in ordered_ids.iter().enumerate() {
                 if let Some(b) = rows
                     .iter_mut()
-                    .find(|b| b.id == *id && b.project_id == project_id)
+                    .find(|b| b.id() == *id && b.project_id() == project_id)
                 {
-                    b.position = Position::new(index as i32).unwrap();
+                    b.reposition(Position::new(index as i32).unwrap());
                 }
             }
             Ok(())
@@ -425,8 +437,8 @@ mod tests {
         let svc = service(repo.clone(), FakeDirectory::present());
         let project = ProjectId::new();
         let board = svc.create(project, "B").await.unwrap();
-        let column = svc.create_column(board.id, "To Do").await.unwrap();
-        (svc, repo, board.id, column.id)
+        let column = svc.create_column(board.id(), "To Do").await.unwrap();
+        (svc, repo, board.id(), column.id())
     }
 
     #[tokio::test]
@@ -437,8 +449,11 @@ mod tests {
 
         let first = svc.create(project, "A").await.unwrap();
         let second = svc.create(project, "  B  ").await.unwrap();
-        assert_eq!((first.position.value(), second.position.value()), (0, 1));
-        assert_eq!(second.name.as_str(), "B");
+        assert_eq!(
+            (first.position().value(), second.position().value()),
+            (0, 1)
+        );
+        assert_eq!(second.name().as_str(), "B");
 
         assert!(matches!(
             svc.create(project, "  ").await.unwrap_err(),
@@ -482,7 +497,7 @@ mod tests {
         let board = svc.create(ProjectId::new(), "Old").await.unwrap();
 
         assert_eq!(
-            svc.update(board.id, "New").await.unwrap().name.as_str(),
+            svc.update(board.id(), "New").await.unwrap().name().as_str(),
             "New"
         );
         assert!(matches!(
@@ -490,9 +505,9 @@ mod tests {
             ApplicationError::NotFound
         ));
 
-        svc.delete(board.id).await.unwrap();
+        svc.delete(board.id()).await.unwrap();
         assert!(matches!(
-            svc.delete(board.id).await.unwrap_err(),
+            svc.delete(board.id()).await.unwrap_err(),
             ApplicationError::NotFound
         ));
     }
@@ -501,9 +516,9 @@ mod tests {
     async fn reorder_permutes_or_rejects() {
         let svc = service(FakeBoardRepo::new(), FakeDirectory::present());
         let project = ProjectId::new();
-        let a = svc.create(project, "A").await.unwrap().id;
-        let b = svc.create(project, "B").await.unwrap().id;
-        let c = svc.create(project, "C").await.unwrap().id;
+        let a = svc.create(project, "A").await.unwrap().id();
+        let b = svc.create(project, "B").await.unwrap().id();
+        let c = svc.create(project, "C").await.unwrap().id();
 
         svc.reorder(project, vec![c, a, b]).await.unwrap();
         let ordered: Vec<BoardId> = svc
@@ -511,7 +526,7 @@ mod tests {
             .await
             .unwrap()
             .iter()
-            .map(|b| b.id)
+            .map(|b| b.id())
             .collect();
         assert_eq!(ordered, [c, a, b]);
 
@@ -544,13 +559,13 @@ mod tests {
     #[tokio::test]
     async fn column_rename_delete_and_reorder_go_through_the_root() {
         let (svc, _repo, board_id, column) = board_with_column().await;
-        let second = svc.create_column(board_id, "Second").await.unwrap().id;
+        let second = svc.create_column(board_id, "Second").await.unwrap().id();
 
         assert_eq!(
             svc.rename_column(column, "Renamed")
                 .await
                 .unwrap()
-                .name
+                .name()
                 .as_str(),
             "Renamed"
         );
@@ -564,7 +579,7 @@ mod tests {
             .unwrap();
         let full = svc.get_full(board_id).await.unwrap().unwrap();
         assert_eq!(
-            full.columns.iter().map(|c| c.id).collect::<Vec<_>>(),
+            full.columns().iter().map(|c| c.id()).collect::<Vec<_>>(),
             [second, column]
         );
         assert!(matches!(
@@ -585,32 +600,35 @@ mod tests {
     #[tokio::test]
     async fn card_lifecycle_and_move_go_through_the_root() {
         let (svc, _repo, board_id, column) = board_with_column().await;
-        let other = svc.create_column(board_id, "Done").await.unwrap().id;
+        let other = svc.create_column(board_id, "Done").await.unwrap().id();
 
         let card = svc.create_card(column, "Task", Some("body")).await.unwrap();
-        assert_eq!(card.description.as_str(), "body");
+        assert_eq!(card.description().as_str(), "body");
         assert_eq!(
             svc.create_card(column, "Second", None)
                 .await
                 .unwrap()
-                .position
+                .position()
                 .value(),
             1
         );
 
-        let updated = svc.update_card(card.id, Some("New"), None).await.unwrap();
+        let updated = svc.update_card(card.id(), Some("New"), None).await.unwrap();
         assert_eq!(
-            (updated.title.as_str(), updated.description.as_str()),
+            (updated.title().as_str(), updated.description().as_str()),
             ("New", "body")
         );
 
-        assert_eq!(svc.get_card(card.id).await.unwrap().title.as_str(), "New");
+        assert_eq!(
+            svc.get_card(card.id()).await.unwrap().title().as_str(),
+            "New"
+        );
 
-        svc.move_card(card.id, other, 0).await.unwrap();
-        assert_eq!(svc.list_cards(other).await.unwrap()[0].id, card.id);
+        svc.move_card(card.id(), other, 0).await.unwrap();
+        assert_eq!(svc.list_cards(other).await.unwrap()[0].id(), card.id());
         assert_eq!(svc.list_cards(column).await.unwrap().len(), 1);
 
-        svc.delete_card(card.id).await.unwrap();
+        svc.delete_card(card.id()).await.unwrap();
         assert!(svc.list_cards(other).await.unwrap().is_empty());
     }
 
@@ -645,11 +663,11 @@ mod tests {
 
         let card = svc.create_card(column, "A", None).await.unwrap();
         assert!(matches!(
-            svc.move_card(card.id, column, -1).await.unwrap_err(),
+            svc.move_card(card.id(), column, -1).await.unwrap_err(),
             ApplicationError::Domain(DomainError::NegativePosition(-1))
         ));
         assert!(matches!(
-            svc.move_card(card.id, ColumnId::new(), 0)
+            svc.move_card(card.id(), ColumnId::new(), 0)
                 .await
                 .unwrap_err(),
             ApplicationError::NotFound

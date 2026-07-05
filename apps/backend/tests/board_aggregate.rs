@@ -23,32 +23,32 @@ async fn seeded(pool: &sqlx::PgPool) -> (PgBoardRepo, BoardId, ColumnId, ColumnI
         .await
         .unwrap();
     let board = Board::new(
-        project.id,
+        project.id(),
         EntityName::new("B").unwrap(),
         Position::new(0).unwrap(),
     );
     let repo = PgBoardRepo::new(pool.clone());
     repo.insert_within_limit(&board, 99).await.unwrap();
 
-    let mut aggregate = repo.load(board.id).await.unwrap().unwrap();
+    let mut aggregate = repo.load(board.id()).await.unwrap().unwrap();
     let todo = aggregate
         .add_column(EntityName::new("To Do").unwrap())
         .unwrap()
-        .id;
+        .id();
     let done = aggregate
         .add_column(EntityName::new("Done").unwrap())
         .unwrap()
-        .id;
+        .id();
     let a = aggregate
         .add_card(todo, Title::new("A").unwrap(), Description::default())
         .unwrap()
-        .id;
+        .id();
     let b = aggregate
         .add_card(todo, Title::new("B").unwrap(), Description::default())
         .unwrap()
-        .id;
+        .id();
     repo.save(&aggregate).await.unwrap();
-    (repo, board.id, todo, done, a, b)
+    (repo, board.id(), todo, done, a, b)
 }
 
 db_test! {
@@ -63,12 +63,12 @@ db_test! {
 
         let reloaded = repo.load(board).await.unwrap().unwrap();
         let doing = reloaded.column(todo).unwrap();
-        assert_eq!(doing.name.as_str(), "Doing");
-        assert!(doing.cards.is_empty());
+        assert_eq!(doing.name().as_str(), "Doing");
+        assert!(doing.cards().is_empty());
         let done = reloaded.column(done).unwrap();
-        let titles: Vec<&str> = done.cards.iter().map(|c| c.title.as_str()).collect();
+        let titles: Vec<&str> = done.cards().iter().map(|c| c.title().as_str()).collect();
         assert_eq!(titles, ["A"]);
-        assert_eq!(done.cards[0].column_id, done.id);
+        assert_eq!(done.cards()[0].column_id(), done.id());
     }
 }
 
@@ -81,7 +81,7 @@ db_test! {
         repo.save(&aggregate).await.unwrap();
 
         let reloaded = repo.load(board).await.unwrap().unwrap();
-        assert_eq!(reloaded.columns.len(), 1);
+        assert_eq!(reloaded.columns().len(), 1);
         assert!(reloaded.column(todo).is_none());
         assert!(repo.load_by_card(a).await.unwrap().is_none());
     }
@@ -91,8 +91,8 @@ db_test! {
     async fn load_by_column_and_card_resolve_the_owning_board(pool: PgPool) {
         let (repo, board, todo, _done, a, _b) = seeded(&pool).await;
 
-        assert_eq!(repo.load_by_column(todo).await.unwrap().unwrap().id, board);
-        assert_eq!(repo.load_by_card(a).await.unwrap().unwrap().id, board);
+        assert_eq!(repo.load_by_column(todo).await.unwrap().unwrap().id(), board);
+        assert_eq!(repo.load_by_card(a).await.unwrap().unwrap().id(), board);
         assert!(repo.load_by_column(ColumnId::new()).await.unwrap().is_none());
         assert!(repo.load_by_card(CardId::new()).await.unwrap().is_none());
     }

@@ -27,7 +27,7 @@ async fn seed_project(pool: &sqlx::PgPool) -> ProjectId {
         Position::new(0).unwrap(),
     );
     repo.insert(&p).await.unwrap();
-    p.id
+    p.id()
 }
 
 fn board(project: ProjectId, name: &str, position: i32) -> Board {
@@ -45,9 +45,31 @@ db_test! {
         let b = board(project, "Backlog", 0);
 
         assert_eq!(repo.insert_within_limit(&b, 99).await.unwrap(), LimitedInsert::Created);
-        let fetched = repo.summary(b.id).await.unwrap().unwrap();
-        assert_eq!(fetched.name.as_str(), "Backlog");
-        assert_eq!(fetched.project_id, project);
+        let fetched = repo.summary(b.id()).await.unwrap().unwrap();
+        assert_eq!(fetched.name().as_str(), "Backlog");
+        assert_eq!(fetched.project_id(), project);
+        // Position is assigned by the repo (first board in the project → 0).
+        assert_eq!(fetched.position().value(), 0);
+    }
+}
+
+db_test! {
+    async fn insert_assigns_the_next_position_after_a_gap(pool: PgPool) {
+        let project = seed_project(&pool).await;
+        let repo = PgBoardRepo::new(pool);
+        let first = board(project, "A", 0);
+        let second = board(project, "B", 0);
+        repo.insert_within_limit(&first, 99).await.unwrap();
+        repo.insert_within_limit(&second, 99).await.unwrap();
+        repo.delete(first.id()).await.unwrap(); // leaves a gap; only position 1 remains
+
+        let third = board(project, "C", 0);
+        repo.insert_within_limit(&third, 99).await.unwrap();
+        // Uses max(position)+1, so 2 — a count-based guess (1) would collide with B.
+        assert_eq!(
+            repo.summary(third.id()).await.unwrap().unwrap().position().value(),
+            2
+        );
     }
 }
 
@@ -78,8 +100,9 @@ db_test! {
         let repo = PgBoardRepo::new(pool.clone());
         let a = seed_project(&pool).await;
         let b = seed_project(&pool).await;
-        repo.insert_within_limit(&board(a, "A2", 2), 99).await.unwrap();
+        // insert_within_limit appends, so insertion order is position order.
         repo.insert_within_limit(&board(a, "A0", 0), 99).await.unwrap();
+        repo.insert_within_limit(&board(a, "A1", 0), 99).await.unwrap();
         repo.insert_within_limit(&board(b, "B0", 0), 99).await.unwrap();
 
         let names: Vec<String> = repo
@@ -87,9 +110,9 @@ db_test! {
             .await
             .unwrap()
             .iter()
-            .map(|x| x.name.as_str().to_owned())
+            .map(|x| x.name().as_str().to_owned())
             .collect();
-        assert_eq!(names, ["A0", "A2"]);
+        assert_eq!(names, ["A0", "A1"]);
     }
 }
 
@@ -106,8 +129,8 @@ db_test! {
         let repo = PgBoardRepo::new(pool);
         let b = board(project, "Old", 0);
         repo.insert_within_limit(&b, 99).await.unwrap();
-        repo.update(b.id, EntityName::new("New").unwrap()).await.unwrap();
-        assert_eq!(repo.summary(b.id).await.unwrap().unwrap().name.as_str(), "New");
+        repo.update(b.id(), EntityName::new("New").unwrap()).await.unwrap();
+        assert_eq!(repo.summary(b.id()).await.unwrap().unwrap().name().as_str(), "New");
     }
 }
 
@@ -117,8 +140,8 @@ db_test! {
         let repo = PgBoardRepo::new(pool);
         let b = board(project, "Gone", 0);
         repo.insert_within_limit(&b, 99).await.unwrap();
-        repo.delete(b.id).await.unwrap();
-        assert!(repo.summary(b.id).await.unwrap().is_none());
+        repo.delete(b.id()).await.unwrap();
+        assert!(repo.summary(b.id()).await.unwrap().is_none());
     }
 }
 
@@ -130,10 +153,10 @@ db_test! {
         for x in [&a, &b, &c] {
             repo.insert_within_limit(x, 99).await.unwrap();
         }
-        repo.reorder(project, &[c.id, a.id, b.id]).await.unwrap();
+        repo.reorder(project, &[c.id(), a.id(), b.id()]).await.unwrap();
 
-        let ordered: Vec<BoardId> = repo.list_by_project(project).await.unwrap().iter().map(|x| x.id).collect();
-        assert_eq!(ordered, [c.id, a.id, b.id]);
+        let ordered: Vec<BoardId> = repo.list_by_project(project).await.unwrap().iter().map(|x| x.id()).collect();
+        assert_eq!(ordered, [c.id(), a.id(), b.id()]);
     }
 }
 

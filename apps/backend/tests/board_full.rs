@@ -29,7 +29,7 @@ async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
         .await
         .unwrap();
     let board = Board::new(
-        project.id,
+        project.id(),
         EntityName::new("B").unwrap(),
         Position::new(0).unwrap(),
     );
@@ -37,7 +37,7 @@ async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
         .insert_within_limit(&board, 99)
         .await
         .unwrap();
-    board.id
+    board.id()
 }
 
 fn app(pool: &sqlx::PgPool) -> Router {
@@ -65,8 +65,8 @@ db_test! {
         let repo = PgBoardRepo::new(pool.clone());
 
         let mut aggregate = repo.load(board).await.unwrap().unwrap();
-        let todo = aggregate.add_column(EntityName::new("To Do").unwrap()).unwrap().id;
-        let doing = aggregate.add_column(EntityName::new("Doing").unwrap()).unwrap().id;
+        let todo = aggregate.add_column(EntityName::new("To Do").unwrap()).unwrap().id();
+        let doing = aggregate.add_column(EntityName::new("Doing").unwrap()).unwrap().id();
         aggregate.add_column(EntityName::new("Done").unwrap()).unwrap();
         aggregate.add_card(todo, Title::new("A1").unwrap(), Description::default()).unwrap();
         aggregate.add_card(todo, Title::new("A2").unwrap(), Description::default()).unwrap();

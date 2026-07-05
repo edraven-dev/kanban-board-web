@@ -27,7 +27,7 @@ async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
         .await
         .unwrap();
     let board = Board::new(
-        project.id,
+        project.id(),
         EntityName::new("B").unwrap(),
         Position::new(0).unwrap(),
     );
@@ -35,7 +35,7 @@ async fn seed_board(pool: &sqlx::PgPool) -> BoardId {
         .insert_within_limit(&board, 99)
         .await
         .unwrap();
-    board.id
+    board.id()
 }
 
 async fn seed_columns(pool: &sqlx::PgPool, board: BoardId, count: usize) {

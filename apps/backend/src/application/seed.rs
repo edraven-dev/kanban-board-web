@@ -3,8 +3,10 @@ use uuid::Uuid;
 
 use crate::application::board_service::MAX_BOARDS_PER_PROJECT;
 use crate::domain::board::Board;
+use crate::domain::card::Card;
+use crate::domain::column::Column;
 use crate::domain::description::Description;
-use crate::domain::ids::{ColumnId, ProjectId};
+use crate::domain::ids::{BoardId, CardId, ColumnId, ProjectId};
 use crate::domain::name::EntityName;
 use crate::domain::ports::{BoardRepository, ProjectRepository, RepoResult};
 use crate::domain::position::Position;
@@ -23,6 +25,8 @@ pub struct SeedSummary {
     pub cards: usize,
 }
 
+type ColumnSpec<'a> = (&'a str, &'a [(&'a str, &'a str)]);
+
 /// Populates a demo project (two boards, six columns, ten cards with staggered
 /// `created_at`s) for local development. Idempotent: any prior demo project is
 /// removed by its fixed id first, so re-running converges to the same state.
@@ -33,16 +37,21 @@ pub async fn seed(
     let project_id = ProjectId::from_uuid(DEMO_PROJECT_ID);
     projects.delete(project_id).await?;
 
-    let mut project = Project::new(name("Demo Project"), pos(0));
-    project.id = project_id;
+    let project = Project::from_parts(
+        project_id,
+        name("Demo Project"),
+        pos(0),
+        Utc::now(),
+        Utc::now(),
+    );
     projects.insert(&project).await?;
 
     let demo = demo_boards(project_id);
-    let columns = demo.iter().map(|b| b.columns.len()).sum();
+    let columns = demo.iter().map(|b| b.columns().len()).sum();
     let cards = demo
         .iter()
-        .flat_map(|b| &b.columns)
-        .map(|c| c.cards.len())
+        .flat_map(Board::columns)
+        .map(|c| c.cards().len())
         .sum();
     for board in &demo {
         boards
@@ -60,56 +69,109 @@ pub async fn seed(
 }
 
 fn demo_boards(project_id: ProjectId) -> Vec<Board> {
-    let mut roadmap = Board::new(project_id, name("Product Roadmap"), pos(0));
-    let backlog = add_column(&mut roadmap, "Backlog");
-    let doing = add_column(&mut roadmap, "In Progress");
-    let done = add_column(&mut roadmap, "Done");
-    add_card(
-        &mut roadmap,
-        backlog,
-        "Dark mode",
-        "Respect the OS theme with a manual toggle.",
-    );
-    add_card(&mut roadmap, backlog, "Bulk card actions", "");
-    add_card(&mut roadmap, backlog, "Keyboard shortcuts", "");
-    add_card(
-        &mut roadmap,
-        doing,
-        "Drag-and-drop polish",
-        "Smooth cross-column moves.",
-    );
-    add_card(&mut roadmap, doing, "Board sharing", "");
-    add_card(&mut roadmap, done, "Card details modal", "");
-    add_card(&mut roadmap, done, "Column reordering", "");
-
-    let mut bugs = Board::new(project_id, name("Bug Tracker"), pos(1));
-    let reported = add_column(&mut bugs, "Reported");
-    let investigating = add_column(&mut bugs, "Investigating");
-    let resolved = add_column(&mut bugs, "Resolved");
-    add_card(
-        &mut bugs,
-        reported,
-        "Cards flicker on move",
-        "Only in Safari.",
-    );
-    add_card(
-        &mut bugs,
-        investigating,
-        "Slow board load",
-        "Boards over 50 cards take >2s.",
-    );
-    add_card(&mut bugs, resolved, "Login redirect loop", "");
+    let roadmap: &[ColumnSpec] = &[
+        (
+            "Backlog",
+            &[
+                ("Dark mode", "Respect the OS theme with a manual toggle."),
+                ("Bulk card actions", ""),
+                ("Keyboard shortcuts", ""),
+            ],
+        ),
+        (
+            "In Progress",
+            &[
+                ("Drag-and-drop polish", "Smooth cross-column moves."),
+                ("Board sharing", ""),
+            ],
+        ),
+        (
+            "Done",
+            &[("Card details modal", ""), ("Column reordering", "")],
+        ),
+    ];
+    let bugs: &[ColumnSpec] = &[
+        ("Reported", &[("Cards flicker on move", "Only in Safari.")]),
+        (
+            "Investigating",
+            &[("Slow board load", "Boards over 50 cards take >2s.")],
+        ),
+        ("Resolved", &[("Login redirect loop", "")]),
+    ];
 
     let now = Utc::now();
-    let mut boards = vec![roadmap, bugs];
-    for board in &mut boards {
-        stagger_created_at(board, now);
-    }
-    boards
+    vec![
+        board(project_id, "Product Roadmap", 0, roadmap, now),
+        board(project_id, "Bug Tracker", 1, bugs, now),
+    ]
 }
 
-// Spreads card timestamps into the past so the UI shows a range of "created N ago".
-fn stagger_created_at(board: &mut Board, now: DateTime<Utc>) {
+fn board(
+    project_id: ProjectId,
+    name_: &str,
+    position: i32,
+    columns_spec: &[ColumnSpec],
+    now: DateTime<Utc>,
+) -> Board {
+    let board_id = BoardId::new();
+    // A rolling index spreads card timestamps into the past across the whole board.
+    let mut age = 0usize;
+    let columns = columns_spec
+        .iter()
+        .enumerate()
+        .map(|(index, (col_name, cards))| {
+            column(board_id, col_name, index as i32, cards, now, &mut age)
+        })
+        .collect();
+    Board::from_parts(
+        board_id,
+        project_id,
+        name(name_),
+        pos(position),
+        now,
+        now,
+        columns,
+    )
+}
+
+fn column(
+    board_id: BoardId,
+    name_: &str,
+    position: i32,
+    cards_spec: &[(&str, &str)],
+    now: DateTime<Utc>,
+    age: &mut usize,
+) -> Column {
+    let column_id = ColumnId::new();
+    let cards = cards_spec
+        .iter()
+        .enumerate()
+        .map(|(index, (card_title, card_desc))| {
+            let created = now - card_age(*age);
+            *age += 1;
+            Card::from_parts(
+                CardId::new(),
+                column_id,
+                title(card_title),
+                desc(card_desc),
+                pos(index as i32),
+                created,
+                created,
+            )
+        })
+        .collect();
+    Column::from_parts(
+        column_id,
+        board_id,
+        name(name_),
+        pos(position),
+        now,
+        now,
+        cards,
+    )
+}
+
+fn card_age(index: usize) -> Duration {
     let offsets = [
         Duration::minutes(6),
         Duration::minutes(52),
@@ -118,29 +180,7 @@ fn stagger_created_at(board: &mut Board, now: DateTime<Utc>) {
         Duration::days(3),
         Duration::days(8),
     ];
-    for (index, card) in board
-        .columns
-        .iter_mut()
-        .flat_map(|c| c.cards.iter_mut())
-        .enumerate()
-    {
-        let at = now - offsets[index % offsets.len()];
-        card.created_at = at;
-        card.updated_at = at;
-    }
-}
-
-fn add_column(board: &mut Board, name_: &str) -> ColumnId {
-    board
-        .add_column(name(name_))
-        .expect("within column limit")
-        .id
-}
-
-fn add_card(board: &mut Board, column: ColumnId, title_: &str, description: &str) {
-    board
-        .add_card(column, title(title_), desc(description))
-        .expect("seeded column exists");
+    offsets[index % offsets.len()]
 }
 
 fn name(value: &str) -> EntityName {
