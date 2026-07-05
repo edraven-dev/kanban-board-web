@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsDragging } from "@/lib/dnd/dragging";
 import { pastelGradient } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +20,6 @@ const SURFACE =
 
 type EntityTileProps = {
   name: string;
-  /** Seed for the deterministic pastel background (e.g. the entity id). */
   seed: string;
   href?: string;
   openLabel?: string;
@@ -27,15 +27,9 @@ type EntityTileProps = {
   renameLabel?: string;
   onRename?: (name: string) => void;
   onDelete?: () => void;
-  /** Non-interactive lifted look for a drag overlay. */
   preview?: boolean;
 };
 
-/**
- * Rounded rectangular tile with a deterministic pastel gradient. Shows only the
- * name (truncated, full name in a tooltip); the whole tile navigates, with a
- * hover overflow menu for rename/delete. Reused for projects and boards.
- */
 export function EntityTile({
   name,
   seed,
@@ -48,6 +42,7 @@ export function EntityTile({
   preview,
 }: EntityTileProps) {
   const [editing, setEditing] = useState(false);
+  const dragging = useIsDragging();
   const background = { backgroundImage: pastelGradient(seed) };
 
   if (preview) {
@@ -75,12 +70,13 @@ export function EntityTile({
 
   return (
     <div className="group relative">
-      <Tooltip>
+      <Tooltip disabled={dragging}>
         <TooltipTrigger
           render={
             <Link
               href={href ?? "#"}
               aria-label={openLabel}
+              draggable={false}
               className={SURFACE}
               style={background}
             />

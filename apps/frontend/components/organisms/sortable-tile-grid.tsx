@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
-  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import {
+  type AnimateLayoutChanges,
   rectSortingStrategy,
   SortableContext,
   useSortable,
@@ -19,7 +19,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { ConfirmDeleteDialog } from "@/components/molecules/confirm-delete-dialog";
 import { EntityTile } from "@/components/molecules/entity-tile";
 import { TileGrid } from "@/components/molecules/tile-grid";
+import { DraggingProvider } from "@/lib/dnd/dragging";
 import { handleDragEnd, useReorder } from "@/lib/hooks/use-reorder";
+
+const noLayoutAnimation: AnimateLayoutChanges = () => false;
 
 type TileItem = { id: string; name: string };
 
@@ -37,11 +40,6 @@ type SortableTileGridProps<T extends TileItem> = {
   onDelete: (id: string) => void;
 };
 
-/**
- * Optimistic drag-reorderable grid of entity tiles. Shared by the project
- * chooser and a project's board list — only labels, links, and the persistence
- * callbacks differ.
- */
 export function SortableTileGrid<T extends TileItem>({
   items,
   queryKey,
@@ -55,7 +53,7 @@ export function SortableTileGrid<T extends TileItem>({
   onRename,
   onDelete,
 }: SortableTileGridProps<T>) {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const reorder = useReorder<T>(queryKey, reorderPersist);
 
   // Distance constraint so a tap opens the tile and only a drag reorders it.
@@ -63,47 +61,42 @@ export function SortableTileGrid<T extends TileItem>({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const active = items.find((item) => item.id === activeId);
-
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={({ active: dragged }) => setActiveId(String(dragged.id))}
-      onDragEnd={(event) => {
-        handleDragEnd(event, reorder.mutate);
-        setActiveId(null);
-      }}
-      onDragCancel={() => setActiveId(null)}
-    >
-      <SortableContext
-        items={items.map((item) => item.id)}
-        strategy={rectSortingStrategy}
+    <DraggingProvider value={dragging}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={() => setDragging(true)}
+        onDragEnd={(event) => {
+          handleDragEnd(event, reorder.mutate);
+          setDragging(false);
+        }}
+        onDragCancel={() => setDragging(false)}
       >
-        <TileGrid>
-          {items.map((item) => (
-            <SortableTile
-              key={item.id}
-              id={item.id}
-              name={item.name}
-              href={hrefFor(item)}
-              openLabel={openLabelFor(item)}
-              menuLabel={menuLabelFor(item)}
-              renameLabel={renameLabel}
-              deleteTitle={deleteTitleFor(item)}
-              deleteDescription={deleteDescription}
-              onRename={(name) => onRename(item.id, name)}
-              onDelete={() => onDelete(item.id)}
-            />
-          ))}
-        </TileGrid>
-      </SortableContext>
-      <DragOverlay>
-        {active ? (
-          <EntityTile name={active.name} seed={active.id} preview />
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+        <SortableContext
+          items={items.map((item) => item.id)}
+          strategy={rectSortingStrategy}
+        >
+          <TileGrid>
+            {items.map((item) => (
+              <SortableTile
+                key={item.id}
+                id={item.id}
+                name={item.name}
+                href={hrefFor(item)}
+                openLabel={openLabelFor(item)}
+                menuLabel={menuLabelFor(item)}
+                renameLabel={renameLabel}
+                deleteTitle={deleteTitleFor(item)}
+                deleteDescription={deleteDescription}
+                onRename={(name) => onRename(item.id, name)}
+                onDelete={() => onDelete(item.id)}
+              />
+            ))}
+          </TileGrid>
+        </SortableContext>
+      </DndContext>
+    </DraggingProvider>
   );
 }
 
@@ -134,17 +127,37 @@ function SortableTile({
 }: SortableTileProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { setNodeRef, listeners, transform, transition, isDragging } =
-    useSortable({ id });
+    useSortable({ id, animateLayoutChanges: noLayoutAnimation });
+
+  const draggedRef = useRef(false);
+  useEffect(() => {
+    if (isDragging) draggedRef.current = true;
+  }, [isDragging]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : undefined,
+    opacity: isDragging ? 0.4 : undefined,
   };
 
   return (
     <>
-      <div ref={setNodeRef} style={style} {...listeners} className="touch-none">
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        className="touch-none"
+        onPointerDownCapture={() => {
+          draggedRef.current = false;
+        }}
+        onClickCapture={(event) => {
+          if (draggedRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            draggedRef.current = false;
+          }
+        }}
+      >
         <EntityTile
           name={name}
           seed={id}
