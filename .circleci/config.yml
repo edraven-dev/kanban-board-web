@@ -12,9 +12,6 @@ executors:
     machine:
       image: ubuntu-2404:current
     resource_class: medium
-    environment:
-      # sccache requires incremental compilation to be off.
-      CARGO_INCREMENTAL: "0"
 
 commands:
   setup:
@@ -30,101 +27,32 @@ commands:
       - run:
           name: Ensure clippy is installed
           command: rustup component add clippy
-      - run:
-          name: Install sccache
-          command: |
-            curl --proto '=https' --tlsv1.2 -fsSL https://github.com/mozilla/sccache/releases/download/v0.16.0/sccache-v0.16.0-x86_64-unknown-linux-musl.tar.gz | tar xzf - -C /tmp
-            sudo mv /tmp/sccache-v0.16.0-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache
-            sudo chmod +x /usr/local/bin/sccache
-      - run:
-          name: Route rustc through sccache
-          command: |
-            echo 'export RUSTC_WRAPPER=sccache' >> "$BASH_ENV"
-            echo 'export SCCACHE_DIR=$HOME/.cache/sccache' >> "$BASH_ENV"
-            echo 'export SCCACHE_CACHE_SIZE=2G' >> "$BASH_ENV"
-      # Downloaded crate sources — one shared cache, keyed on the lockfile.
-      - restore_cache:
-          keys:
-            - cargo-registry-v1-{{ checksum "apps/backend/Cargo.lock" }}
-            - cargo-registry-v1-
-      # One shared, content-addressed compilation cache for every job and profile
-      # (replaces per-job target/ caches). It accumulates across runs; the first job
-      # to finish each run persists it.
-      - restore_cache:
-          keys:
-            - sccache-v1-{{ .Branch }}-{{ .Revision }}
-            - sccache-v1-{{ .Branch }}-
-            - sccache-v1-
-
-  save_sccache:
-    steps:
-      - run:
-          name: sccache stats
-          command: sccache --show-stats
-      - save_cache:
-          key: sccache-v1-{{ .Branch }}-{{ .Revision }}
-          paths:
-            - ~/.cache/sccache
-
-  # Turborepo's own local cache. Restoring it between runs lets turbo replay
-  # unchanged tasks (a cache hit skips execution entirely). Per job + branch, with a
-  # rolling revision suffix so each run writes a fresh entry.
-  restore_turbo_cache:
-    steps:
-      - restore_cache:
-          keys:
-            - turbo-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-
-            - turbo-{{ .Environment.CIRCLE_JOB }}-
-  save_turbo_cache:
-    steps:
-      - save_cache:
-          key: turbo-{{ .Environment.CIRCLE_JOB }}-{{ .Branch }}-{{ .Revision }}
-          paths:
-            - .turbo/cache
 
 jobs:
   build:
     executor: turbo
     steps:
       - setup
-      - restore_turbo_cache
       - run:
           name: Build (turbo)
           command: pnpm run build
-      - save_sccache
-      - save_turbo_cache
-      # Save the crate-source cache from one job; the key is immutable per lockfile.
-      - save_cache:
-          key: cargo-registry-v1-{{ checksum "apps/backend/Cargo.lock" }}
-          paths:
-            - ~/.cargo/registry
-            - ~/.cargo/git
 
   lint:
     executor: turbo
     steps:
       - setup
-      - restore_turbo_cache
       - run:
           name: Lint (turbo)
           command: pnpm run lint
-      - save_sccache
-      - save_turbo_cache
 
   check-types:
     executor: turbo
     steps:
       - setup
-      - restore_turbo_cache
       - run:
           name: Check types (turbo)
           command: pnpm run check-types
-      - save_sccache
-      - save_turbo_cache
 
-  # Coverage runs the backend suite under instrumentation, enforces the ≥90% gate,
-  # and publishes the HTML report. It intentionally does NOT use the turbo cache: a
-  # cache hit would skip the test run and leave no coverage data for the report.
   coverage:
     executor: turbo
     steps:
@@ -143,7 +71,6 @@ jobs:
       - store_artifacts:
           path: apps/backend/target/llvm-cov/html
           destination: coverage
-      - save_sccache
 
 workflows:
   ci:
