@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   closestCenter,
+  closestCorners,
+  type CollisionDetection,
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -16,22 +20,42 @@ import {
 } from "@dnd-kit/sortable";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { CardTile } from "@/components/molecules/card-tile";
 import { InlineCreate } from "@/components/molecules/inline-create";
 import { KanbanColumn } from "@/components/organisms/kanban-column";
+import { CardModal } from "@/components/organisms/card-modal";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Card } from "@/lib/api/schemas";
 import {
   COLUMN_LIMIT,
   useBoardFull,
   useCreateColumn,
   useReorderColumns,
 } from "@/lib/hooks/use-columns";
-import { handleDragEnd } from "@/lib/hooks/use-reorder";
+import { activeCardFromDragStart, onBoardDragEnd } from "@/lib/dnd/board-dnd";
+import { useMoveCard } from "@/lib/hooks/use-cards";
+
+// While dragging a column, only collide with columns; cards collide with both.
+const collisionDetection: CollisionDetection = (args) => {
+  if (args.active.data.current?.type === "column") {
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (container) => container.data.current?.type === "column",
+      ),
+    });
+  }
+  return closestCorners(args);
+};
 
 export function BoardCanvas({ boardId }: { boardId: string }) {
   const { data: board, isPending, isError } = useBoardFull(boardId);
   const createColumn = useCreateColumn(boardId);
   const reorderColumns = useReorderColumns(boardId);
+  const moveCard = useMoveCard(boardId);
+  const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -55,6 +79,12 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
   }
 
   const atLimit = board.columns.length >= COLUMN_LIMIT;
+  const selectedColumn = board.columns.find((column) =>
+    column.cards.some((card) => card.id === selectedCardId),
+  );
+  const selectedCard = selectedColumn?.cards.find(
+    (card) => card.id === selectedCardId,
+  );
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -73,8 +103,16 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={(event) => handleDragEnd(event, reorderColumns.mutate)}
+        collisionDetection={collisionDetection}
+        onDragStart={(event) => setActiveCard(activeCardFromDragStart(event, board))}
+        onDragEnd={(event) => {
+          setActiveCard(null);
+          onBoardDragEnd(event, board, {
+            reorderColumns: reorderColumns.mutate,
+            moveCard: moveCard.mutate,
+          });
+        }}
+        onDragCancel={() => setActiveCard(null)}
       >
         <SortableContext
           items={board.columns.map((column) => column.id)}
@@ -90,7 +128,12 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
             }}
           >
             {board.columns.map((column) => (
-              <KanbanColumn key={column.id} boardId={boardId} column={column} />
+              <KanbanColumn
+                key={column.id}
+                boardId={boardId}
+                column={column}
+                onCardClick={setSelectedCardId}
+              />
             ))}
             {!atLimit && (
               <div className="w-72 shrink-0">
@@ -102,7 +145,20 @@ export function BoardCanvas({ boardId }: { boardId: string }) {
             )}
           </div>
         </SortableContext>
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? <CardTile card={activeCard} /> : null}
+        </DragOverlay>
       </DndContext>
+
+      <CardModal
+        boardId={boardId}
+        card={selectedCard}
+        columnName={selectedColumn?.name}
+        open={selectedCard !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCardId(null);
+        }}
+      />
     </div>
   );
 }

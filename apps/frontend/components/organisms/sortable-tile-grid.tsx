@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -20,6 +20,7 @@ import { ConfirmDeleteDialog } from "@/components/molecules/confirm-delete-dialo
 import { EntityTile } from "@/components/molecules/entity-tile";
 import { TileGrid } from "@/components/molecules/tile-grid";
 import { DraggingProvider } from "@/lib/dnd/dragging";
+import { useClickAfterDragGuard } from "@/lib/dnd/use-click-after-drag-guard";
 import { handleDragEnd, useReorder } from "@/lib/hooks/use-reorder";
 
 const noLayoutAnimation: AnimateLayoutChanges = () => false;
@@ -128,11 +129,7 @@ function SortableTile({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { setNodeRef, listeners, transform, transition, isDragging } =
     useSortable({ id, animateLayoutChanges: noLayoutAnimation });
-
-  const draggedRef = useRef(false);
-  useEffect(() => {
-    if (isDragging) draggedRef.current = true;
-  }, [isDragging]);
+  const clickGuard = useClickAfterDragGuard(isDragging);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -147,16 +144,7 @@ function SortableTile({
         style={style}
         {...listeners}
         className="touch-none"
-        onPointerDownCapture={() => {
-          draggedRef.current = false;
-        }}
-        onClickCapture={(event) => {
-          if (draggedRef.current) {
-            event.preventDefault();
-            event.stopPropagation();
-            draggedRef.current = false;
-          }
-        }}
+        {...clickGuard}
       >
         <EntityTile
           name={name}
