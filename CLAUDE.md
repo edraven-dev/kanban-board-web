@@ -89,11 +89,41 @@ the boundary in application queries.
 **Comment sparingly. Document public interfaces.**
 
 - No verbose or narrating comments. A comment earns its place only when the code can't
-  say it itself — a non-obvious *why*, a subtle invariant, a gotcha. Prefer one tight
+  say it itself — a non-obvious _why_, a subtle invariant, a gotcha. Prefer one tight
   line over a paragraph.
 - Never restate what the code already says. If a comment paraphrases the next line,
   delete it. Strip existing verbose comments as you touch code.
 - **Document public boundaries when the contract isn't obvious.** A public type, trait,
   or function crossing a module/aggregate boundary gets a concise doc comment (`///`
-  rustdoc, JSDoc/TSDoc) *only* when its contract isn't already clear from the signature.
+  rustdoc, JSDoc/TSDoc) _only_ when its contract isn't already clear from the signature.
   One line stating what/why, never how. Don't doc self-evident items.
+
+## 7. Tests Ship With The Change
+
+**Every change lands with its own unit + integration tests. Coverage is gated.**
+
+- No feature or fix lands without tests in the same change — never deferred to a later
+  "testing" pass.
+- The bar: **≥ 90% line/branch overall**, **≥ 95%** for backend `domain`/`application`
+  and frontend `lib`/hooks, **100%** for pure value objects / reducers where feasible.
+  Builds fail under threshold.
+- **Backend**: unit-test the domain and application services with in-memory fake
+  repositories (no DB); integration-test repositories and the assembled axum router
+  against a real Postgres (`db_test!` testcontainers). **Frontend**: unit-test pure
+  logic and components; integration-test feature flows with a real `QueryClient` + MSW,
+  including optimistic update + rollback and the 409-limit path. One Playwright e2e
+  covers the full stack.
+- Drag-and-drop callbacks can't run in jsdom — cover them in the Playwright e2e, not by
+  forcing brittle unit tests. Don't chase branch coverage on genuinely-unreachable
+  defensive fallbacks.
+
+## 8. Conventions
+
+- **Pin dependencies exactly** — no `^`/`~` in `package.json`; Rust crates pinned with
+  `=`. Shared JS config lives in `@repo/eslint-config` / `@repo/typescript-config`; new
+  apps extend them rather than redefining.
+- **Every HTTP endpoint carries a `#[utoipa::path]`** so it appears in
+  `/api/openapi.json` and Swagger UI at `/api/docs`. The whole API is under a global
+  `/api` prefix.
+- **CORS is applied only when `APP_ENV=development`** (permissive, for the cross-origin
+  dev frontend) and **never in production** (served same-origin under `/api`).
