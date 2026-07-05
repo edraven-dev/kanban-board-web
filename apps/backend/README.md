@@ -33,19 +33,22 @@ in-memory fakes and Postgres stays a swappable detail.
 tree. All structural changes to columns and cards go through methods on the `Board` root
 (`src/domain/board.rs`), which enforce the invariants below.
 
-| Entity | Aggregate | Key rules |
-|---|---|---|
-| **Project** | Project *(root)* | name 1–120, trimmed, non-empty |
-| **Board** | Board *(root)* | name 1–120; **≤ 99 boards per project** |
-| **Column** | Board | name 1–120; **≤ 99 columns per board** |
-| **Card** | Board | title 1–200; description ≤ 10 000 (may be empty) |
+| Entity      | Aggregate        | Key rules                                        |
+| ----------- | ---------------- | ------------------------------------------------ |
+| **Project** | Project _(root)_ | name 1–120, trimmed, non-empty                   |
+| **Board**   | Board _(root)_   | name 1–120; **≤ 99 boards per project**          |
+| **Column**  | Board            | name 1–120; **≤ 99 columns per board**           |
+| **Card**    | Board            | title 1–200; description ≤ 10 000 (may be empty) |
 
 Value-object constructors return `Result<_, DomainError>`; the `Board` root returns
 `BoardError` for structural failures (missing column/card, column limit, bad reorder
 set). The **≤ 99 columns** limit and same-/cross-column card moves are enforced by the
 `Board` root; **≤ 99 boards per project** is a Board-side concern checked in
 `BoardService`. Ordering is a contiguous integer `position` (0..n-1) scoped to the
-parent, re-sequenced by the root and persisted with the aggregate.
+parent, re-sequenced by the root and persisted with the aggregate. Positions are
+**not globally unique** (which keeps reorder a simple row-rewrite in one transaction);
+fractional / LexoRank indexing is the documented alternative if counts ever outgrow the
+≤ 99 limits.
 
 **One repository per aggregate root.** `PgProjectRepo` owns the `projects` table;
 `PgBoardRepo` owns `boards` + `columns` + `cards`. Column/card writes **load the whole
@@ -60,6 +63,48 @@ than querying the `projects` table. In this monolith the directory is backed by 
 Project repository; across a service split it would be an API call. The
 `boards.project_id → projects.id` foreign key is kept only as a database safety net, not
 as a licence to read across the boundary.
+
+## API
+
+Every endpoint is under the global `/api` prefix and annotated with `#[utoipa::path]`,
+so the list below is also live at **`/api/docs`** (Swagger UI) and `/api/openapi.json`.
+Request/response bodies are JSON with **camelCase** fields.
+
+```
+GET    /api/health                          # liveness
+GET    /api/docs                            # Swagger UI
+GET    /api/openapi.json                    # OpenAPI 3.1 spec
+
+GET    /api/projects
+POST   /api/projects                        { name }
+PATCH  /api/projects/{id}                   { name }
+DELETE /api/projects/{id}
+PUT    /api/projects/reorder                { orderedIds: [uuid] }
+
+GET    /api/projects/{id}/boards
+POST   /api/projects/{id}/boards            { name }                 # 409 at 99 boards
+GET    /api/boards/{id}/full                # board + columns + cards (nested read model)
+PATCH  /api/boards/{id}                     { name }
+DELETE /api/boards/{id}
+PUT    /api/projects/{id}/boards/reorder    { orderedIds: [uuid] }
+
+GET    /api/boards/{id}/columns
+POST   /api/boards/{id}/columns             { name }                 # 409 at 99 columns
+PATCH  /api/columns/{id}                    { name }
+DELETE /api/columns/{id}
+PUT    /api/boards/{id}/columns/reorder     { orderedIds: [uuid] }
+
+GET    /api/columns/{id}/cards
+POST   /api/columns/{id}/cards              { title, description? }
+GET    /api/cards/{id}
+PATCH  /api/cards/{id}                      { title?, description? }
+DELETE /api/cards/{id}
+PUT    /api/cards/{id}/move                 { columnId, position }   # reorder + cross-column
+```
+
+Errors use a small problem shape `{ "error": { "code", "message" } }`:
+`400 validation`, `404 not_found`, `409 limit_exceeded`, `422 unprocessable`,
+`500 internal`.
 
 ## Run locally
 
@@ -78,6 +123,12 @@ pnpm --filter backend dev   # or: cargo run
   runs on a different origin (`:3000`).
 - `APP_ENV=production` adds **no** CORS layer — production is served same-origin
   under `host.com/api`.
+
+## Observability
+
+Logs go to **stdout** via `tracing` — human-readable in development, structured **JSON**
+in production (so a k8s log collector can ship them to a store like Loki; the app never
+talks to Loki directly). Level is controlled by `RUST_LOG` (default `info`).
 
 ## Seed (dev only)
 
@@ -104,7 +155,7 @@ pnpm --filter backend migrate:revert       # roll back the last migration
 ```
 
 `migrate:add` only creates the file — you write the SQL (sqlx is not an ORM; there's
-no schema diffing). Compile-time-checked queries (`query!`, from later tasks) use an
+no schema diffing). Compile-time-checked queries (`query!`) use an
 offline cache in `.sqlx/` via `cargo sqlx prepare`; set `SQLX_OFFLINE=true` to build
 without a database.
 

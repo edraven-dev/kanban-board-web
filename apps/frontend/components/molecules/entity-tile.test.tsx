@@ -14,6 +14,10 @@ describe("EntityTile", () => {
         seed="a"
         href="/projects/a"
         openLabel="Open Alpha"
+        menuLabel="Alpha actions"
+        renameLabel="Project name"
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -62,6 +66,7 @@ describe("EntityTile", () => {
         href="/projects/a"
         openLabel="Open Alpha"
         menuLabel="Alpha actions"
+        renameLabel="Project name"
         onRename={vi.fn()}
         onDelete={onDelete}
       />,
@@ -71,13 +76,5 @@ describe("EntityTile", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
     expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders a non-interactive preview", () => {
-    renderWithClient(<EntityTile name="Alpha" seed="a" preview />);
-
-    expect(screen.getByText("Alpha")).toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

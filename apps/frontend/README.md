@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# frontend
 
-## Getting Started
+Next.js 16 (App Router, React 19) UI for the Kanban board. Dark theme by default,
+served on port **3000**.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** (App Router, Turbopack, React Strict Mode), **TypeScript** (strict)
+- **Tailwind v4** + **shadcn/ui** on **base-ui** (`@base-ui/react`)
+- **TanStack Query** — server-state cache + optimistic updates
+- **dnd-kit** — accessible drag-and-drop (pointer + keyboard sensors)
+- **react-hook-form** + **zod** — forms and validation
+- **date-fns** — humanized "created N ago" times
+
+## Architecture
+
+**Atomic Design.** Components compose upward and take data via props:
+
+```
+app/                     # routes: / , /projects/[projectId] , /boards/[boardId]
+components/
+  ui/                    # shadcn primitives (generated)
+  atoms/                 # RelativeTime, EmptyState, Spinner
+  molecules/             # EditableTitle, ConfirmDeleteDialog, InlineCreate,
+                         #   EntityMenu, CardTile, SortableItem, TileGrid
+  organisms/             # ProjectList, BoardCanvas, KanbanColumn, CardModal, ...
+lib/
+  api/                   # typed client (client.ts), zod schemas, endpoint fns
+  query/                 # query-key factory + QueryClient provider
+  hooks/                 # useProjects, useBoards, useColumns, useCards, useReorder
+  dnd/                   # board drag routing + shared drag helpers
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Data flow.** TanStack Query owns **all** server state — components never fetch ad
+hoc. The typed API client (`lib/api/client.ts`) is the single I/O boundary and
+validates every response with zod. Mutations do **optimistic updates** that roll back
+and toast on error, which keeps drag reorders and cross-column moves smooth. Reorder
+for projects, boards, columns, and cards shares one generic `useReorder` hook.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**API base URL.** `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`), and every
+path is prefixed with `/api`. In production the value is empty, so requests are
+same-origin (`/api/...`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run
 
-## Learn More
+Needs the backend and Postgres running (see the repo root README). Then:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm --filter frontend dev   # http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Test
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm --filter frontend test           # Vitest + React Testing Library + MSW
+pnpm --filter frontend test:coverage  # coverage, fails under 90% lines/branches
+pnpm --filter frontend test:e2e       # Playwright full-stack happy path
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Unit/integration** — pure logic (API client, zod schemas, hooks) plus feature
+  flows rendered with a real `QueryClient` and the API mocked by **MSW**, covering
+  optimistic update + rollback and the 99-limit (409) paths.
+- **e2e** — a Playwright happy path that drives the real UI against a live
+  frontend + backend + isolated Postgres. Kept separate from `test`. Setup and how to
+  run: [e2e/README.md](e2e/README.md).

@@ -21,13 +21,12 @@ const SURFACE =
 type EntityTileProps = {
   name: string;
   seed: string;
-  href?: string;
-  openLabel?: string;
-  menuLabel?: string;
-  renameLabel?: string;
-  onRename?: (name: string) => void;
-  onDelete?: () => void;
-  preview?: boolean;
+  href: string;
+  openLabel: string;
+  menuLabel: string;
+  renameLabel: string;
+  onRename: (name: string) => void;
+  onDelete: () => void;
 };
 
 export function EntityTile({
@@ -36,22 +35,13 @@ export function EntityTile({
   href,
   openLabel,
   menuLabel,
-  renameLabel = "Name",
+  renameLabel,
   onRename,
   onDelete,
-  preview,
 }: EntityTileProps) {
   const [editing, setEditing] = useState(false);
   const dragging = useIsDragging();
   const background = { backgroundImage: pastelGradient(seed) };
-
-  if (preview) {
-    return (
-      <div className={cn(SURFACE, "shadow-2xl")} style={background}>
-        <span className="w-full truncate">{name}</span>
-      </div>
-    );
-  }
 
   if (editing) {
     return (
@@ -61,7 +51,7 @@ export function EntityTile({
           label={renameLabel}
           autoEdit
           onDone={() => setEditing(false)}
-          onSave={(next) => onRename?.(next)}
+          onSave={onRename}
           className="w-full"
         />
       </div>
@@ -74,7 +64,7 @@ export function EntityTile({
         <TooltipTrigger
           render={
             <Link
-              href={href ?? "#"}
+              href={href}
               aria-label={openLabel}
               draggable={false}
               className={SURFACE}
@@ -86,18 +76,16 @@ export function EntityTile({
         </TooltipTrigger>
         <TooltipContent>{name}</TooltipContent>
       </Tooltip>
-      {(onRename || onDelete) && (
-        <div
-          className="absolute right-1.5 top-1.5 text-neutral-900 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <EntityMenu
-            label={menuLabel ?? `${name} actions`}
-            onRename={() => setEditing(true)}
-            onDelete={() => onDelete?.()}
-          />
-        </div>
-      )}
+      <div
+        className="absolute right-1.5 top-1.5 text-neutral-900 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <EntityMenu
+          label={menuLabel}
+          onRename={() => setEditing(true)}
+          onDelete={onDelete}
+        />
+      </div>
     </div>
   );
 }

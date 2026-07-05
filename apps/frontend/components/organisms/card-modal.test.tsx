@@ -45,6 +45,23 @@ describe("CardModal", () => {
     expect(screen.getByText(cardId)).toBeInTheDocument();
   });
 
+  it("forwards a close from the dialog on Escape", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    renderWithClient(
+      <CardModal
+        boardId={boardId}
+        card={card}
+        columnName="To Do"
+        open
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    await user.keyboard("{Escape}");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("edits the title", async () => {
     const user = userEvent.setup();
     let patched: unknown;

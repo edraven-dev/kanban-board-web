@@ -304,4 +304,24 @@ describe("useCreateCard", () => {
     expect(posted).toEqual({ title: "New" });
     expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
   });
+
+  it("toasts on API error", async () => {
+    const client = newClient();
+    server.use(
+      http.post(
+        `${BASE}/columns/${col1}/cards`,
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
+
+    const { result } = renderHook(() => useCreateCard(boardId), {
+      wrapper: wrapper(client),
+    });
+    act(() => result.current.mutate({ columnId: col1, title: "New" }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+      "Couldn’t create the card.",
+    );
+  });
 });
