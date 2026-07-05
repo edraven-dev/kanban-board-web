@@ -112,4 +112,47 @@ describe("EditableTitle", () => {
       "Name must be 5 characters or fewer",
     );
   });
+
+  it("starts in edit mode with autoEdit and calls onDone after saving", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onDone = vi.fn();
+    render(
+      <EditableTitle
+        value="Todo"
+        label="Name"
+        autoEdit
+        onSave={onSave}
+        onDone={onDone}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Name" });
+    await user.clear(input);
+    await user.type(input, "Done{Enter}");
+
+    expect(onSave).toHaveBeenCalledExactlyOnceWith("Done");
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onDone when editing is cancelled", async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    render(
+      <EditableTitle
+        value="Todo"
+        label="Name"
+        autoEdit
+        onSave={vi.fn()}
+        onDone={onDone}
+      />,
+    );
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "{Escape}",
+    );
+
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
 });

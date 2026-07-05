@@ -2,8 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { createProject, listProjects } from "@/lib/api/projects";
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  updateProject,
+} from "@/lib/api/projects";
+import type { Project } from "@/lib/api/schemas";
 import { queryKeys } from "@/lib/query/keys";
+import { useOptimisticListMutation } from "./use-optimistic-list-mutation";
 
 export function useProjects() {
   return useQuery({
@@ -19,5 +26,27 @@ export function useCreateProject() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
     },
+  });
+}
+
+export function useRenameProject() {
+  return useOptimisticListMutation<{ id: string; name: string }, Project>({
+    queryKey: queryKeys.projects,
+    mutationFn: ({ id, name }) => updateProject(id, { name }),
+    optimisticUpdate: (projects, { id, name }) =>
+      projects.map((project) =>
+        project.id === id ? { ...project, name } : project,
+      ),
+    errorMessage: "Couldn’t rename the project.",
+  });
+}
+
+export function useDeleteProject() {
+  return useOptimisticListMutation<string, Project>({
+    queryKey: queryKeys.projects,
+    mutationFn: (id) => deleteProject(id),
+    optimisticUpdate: (projects, id) =>
+      projects.filter((project) => project.id !== id),
+    errorMessage: "Couldn’t delete the project.",
   });
 }
