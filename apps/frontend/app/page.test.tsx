@@ -1,8 +1,9 @@
 import { http, HttpResponse, delay } from "msw";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import type { Project } from "@/lib/api/schemas";
 import { server } from "@/test/msw/server";
 import { renderWithClient } from "@/test/render";
 
@@ -11,15 +12,15 @@ import Home from "./page";
 const BASE = "http://localhost:5000/api";
 const ts = "2026-07-05T00:00:00Z";
 
-function project(id: string, name: string, position: number) {
+function project(id: string, name: string, position: number): Project {
   return { id, name, position, createdAt: ts, updatedAt: ts };
 }
 
 const alphaId = "018f1e2d-3c4b-7a6d-8e9f-000000000001";
 const betaId = "018f1e2d-3c4b-7a6d-8e9f-000000000002";
 
-describe("Home (project chooser)", () => {
-  it("renders the project list from the API", async () => {
+describe("Home (projects feature)", () => {
+  it("renders the project tiles from the API", async () => {
     server.use(
       http.get(`${BASE}/projects`, () =>
         HttpResponse.json([
@@ -31,9 +32,10 @@ describe("Home (project chooser)", () => {
 
     renderWithClient(<Home />);
 
-    const alpha = await screen.findByRole("link", { name: "Alpha" });
-    expect(alpha).toHaveAttribute("href", `/projects/${alphaId}`);
-    expect(screen.getByRole("link", { name: "Beta" })).toHaveAttribute(
+    expect(
+      await screen.findByRole("link", { name: "Open Alpha" }),
+    ).toHaveAttribute("href", `/projects/${alphaId}`);
+    expect(screen.getByRole("link", { name: "Open Beta" })).toHaveAttribute(
       "href",
       `/projects/${betaId}`,
     );
@@ -93,7 +95,7 @@ describe("Home (project chooser)", () => {
     );
 
     renderWithClient(<Home />);
-    await screen.findByRole("link", { name: "Alpha" });
+    await screen.findByRole("link", { name: "Open Alpha" });
 
     await user.click(screen.getByRole("button", { name: "Add project" }));
     await user.type(
@@ -101,7 +103,68 @@ describe("Home (project chooser)", () => {
       "Beta{Enter}",
     );
 
-    expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "Open Beta" }),
+    ).toBeInTheDocument();
     expect(posted).toEqual({ name: "Beta" });
+  });
+
+  it("renames a project (optimistic + persisted)", async () => {
+    const user = userEvent.setup();
+    const state = [project(alphaId, "Alpha", 0), project(betaId, "Beta", 1)];
+    let patched: unknown;
+    server.use(
+      http.get(`${BASE}/projects`, () => HttpResponse.json(state)),
+      http.patch(`${BASE}/projects/${alphaId}`, async ({ request }) => {
+        patched = await request.json();
+        state[0] = { ...state[0], name: "Renamed" };
+        return HttpResponse.json(state[0]);
+      }),
+    );
+
+    renderWithClient(<Home />);
+
+    await user.click(await screen.findByRole("button", { name: "Alpha actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await user.clear(input);
+    await user.type(input, "Renamed{Enter}");
+
+    expect(
+      await screen.findByRole("link", { name: "Open Renamed" }),
+    ).toBeInTheDocument();
+    expect(patched).toEqual({ name: "Renamed" });
+  });
+
+  it("deletes a project after confirmation", async () => {
+    const user = userEvent.setup();
+    const state = [project(alphaId, "Alpha", 0), project(betaId, "Beta", 1)];
+    let deletedId: string | undefined;
+    server.use(
+      http.get(`${BASE}/projects`, () => HttpResponse.json(state)),
+      http.delete(`${BASE}/projects/:id`, ({ params }) => {
+        deletedId = params.id as string;
+        const index = state.findIndex((p) => p.id === deletedId);
+        if (index !== -1) state.splice(index, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderWithClient(<Home />);
+    await screen.findByRole("link", { name: "Open Alpha" });
+
+    await user.click(screen.getByRole("button", { name: "Alpha actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("link", { name: "Open Alpha" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(deletedId).toBe(alphaId);
+    expect(
+      screen.getByRole("link", { name: "Open Beta" }),
+    ).toBeInTheDocument();
   });
 });

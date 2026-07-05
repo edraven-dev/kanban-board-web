@@ -12,6 +12,10 @@ type EditableTitleProps = {
   label: string;
   maxLength?: number;
   className?: string;
+  /** Start directly in edit mode (e.g. when opened from a menu). */
+  autoEdit?: boolean;
+  /** Called when editing ends (after a save or a cancel). */
+  onDone?: () => void;
 };
 
 /**
@@ -25,8 +29,10 @@ export function EditableTitle({
   label,
   maxLength = 120,
   className,
+  autoEdit = false,
+  onDone,
 }: EditableTitleProps) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit);
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,11 +59,13 @@ export function EditableTitle({
     if (trimmed !== value) onSave(trimmed);
     setError(null);
     setEditing(false);
+    onDone?.();
   }
 
   function cancel() {
     setError(null);
     setEditing(false);
+    onDone?.();
   }
 
   if (!editing) {
