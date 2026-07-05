@@ -30,28 +30,76 @@ pub enum BoardError {
 /// A board's own fields without its columns/cards — the read model for lists and reorder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoardSummary {
-    pub id: BoardId,
-    pub project_id: ProjectId,
-    pub name: EntityName,
-    pub position: Position,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub(in crate::domain) id: BoardId,
+    pub(in crate::domain) project_id: ProjectId,
+    pub(in crate::domain) name: EntityName,
+    pub(in crate::domain) position: Position,
+    pub(in crate::domain) created_at: DateTime<Utc>,
+    pub(in crate::domain) updated_at: DateTime<Utc>,
+}
+
+impl BoardSummary {
+    /// Rebuilds a board summary from its persisted row.
+    pub fn from_parts(
+        id: BoardId,
+        project_id: ProjectId,
+        name: EntityName,
+        position: Position,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            project_id,
+            name,
+            position,
+            created_at,
+            updated_at,
+        }
+    }
+
+    pub fn id(&self) -> BoardId {
+        self.id
+    }
+
+    pub fn project_id(&self) -> ProjectId {
+        self.project_id
+    }
+
+    pub fn name(&self) -> &EntityName {
+        &self.name
+    }
+
+    pub fn position(&self) -> Position {
+        self.position
+    }
+
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
 }
 
 /// Aggregate root owning its ordered columns → cards; all mutations enforce the
 /// invariants here (≤ 99 columns, contiguous positions, in-board card moves).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Board {
-    pub id: BoardId,
-    pub project_id: ProjectId,
-    pub name: EntityName,
-    pub position: Position,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub columns: Vec<Column>,
+    pub(in crate::domain) id: BoardId,
+    pub(in crate::domain) project_id: ProjectId,
+    pub(in crate::domain) name: EntityName,
+    pub(in crate::domain) position: Position,
+    pub(in crate::domain) created_at: DateTime<Utc>,
+    pub(in crate::domain) updated_at: DateTime<Utc>,
+    pub(in crate::domain) columns: Vec<Column>,
 }
 
 impl Board {
+    /// A fresh board. `position` is the requested placement, but
+    /// `BoardRepository::insert_within_limit` reassigns it atomically at insert
+    /// so concurrent creates in a project can't collide.
     pub fn new(project_id: ProjectId, name: EntityName, position: Position) -> Self {
         let now = Utc::now();
         Self {
@@ -63,6 +111,69 @@ impl Board {
             updated_at: now,
             columns: Vec::new(),
         }
+    }
+
+    /// Rebuilds a board aggregate (with its columns and cards) from persisted state.
+    pub fn from_parts(
+        id: BoardId,
+        project_id: ProjectId,
+        name: EntityName,
+        position: Position,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+        columns: Vec<Column>,
+    ) -> Self {
+        Self {
+            id,
+            project_id,
+            name,
+            position,
+            created_at,
+            updated_at,
+            columns,
+        }
+    }
+
+    pub fn rename(&mut self, name: EntityName) {
+        self.name = name;
+        self.updated_at = Utc::now();
+    }
+
+    pub fn reposition(&mut self, position: Position) {
+        self.position = position;
+        self.updated_at = Utc::now();
+    }
+
+    pub fn id(&self) -> BoardId {
+        self.id
+    }
+
+    pub fn project_id(&self) -> ProjectId {
+        self.project_id
+    }
+
+    pub fn name(&self) -> &EntityName {
+        &self.name
+    }
+
+    pub fn position(&self) -> Position {
+        self.position
+    }
+
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    pub fn columns(&self) -> &[Column] {
+        &self.columns
+    }
+
+    pub fn into_columns(self) -> Vec<Column> {
+        self.columns
     }
 
     pub fn to_summary(&self) -> BoardSummary {

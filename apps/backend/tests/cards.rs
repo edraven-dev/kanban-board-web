@@ -27,17 +27,17 @@ async fn seed_column(pool: &sqlx::PgPool) -> ColumnId {
         .await
         .unwrap();
     let board = Board::new(
-        project.id,
+        project.id(),
         EntityName::new("B").unwrap(),
         Position::new(0).unwrap(),
     );
     let repo = PgBoardRepo::new(pool.clone());
     repo.insert_within_limit(&board, 99).await.unwrap();
-    let mut aggregate = repo.load(board.id).await.unwrap().unwrap();
+    let mut aggregate = repo.load(board.id()).await.unwrap().unwrap();
     let column_id = aggregate
         .add_column(EntityName::new("C").unwrap())
         .unwrap()
-        .id;
+        .id();
     repo.save(&aggregate).await.unwrap();
     column_id
 }

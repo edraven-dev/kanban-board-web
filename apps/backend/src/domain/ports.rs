@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::board::{Board, BoardSummary};
+use crate::domain::error::DomainError;
 use crate::domain::ids::{BoardId, CardId, ColumnId, ProjectId};
 use crate::domain::name::EntityName;
 use crate::domain::project::Project;
@@ -17,6 +18,12 @@ impl RepositoryError {
         Self {
             message: message.into(),
         }
+    }
+}
+
+impl From<DomainError> for RepositoryError {
+    fn from(error: DomainError) -> Self {
+        Self::new(error.to_string())
     }
 }
 
@@ -53,9 +60,10 @@ pub trait BoardRepository: Send + Sync {
     async fn reorder(&self, project_id: ProjectId, ordered_ids: &[BoardId]) -> RepoResult<()>;
 }
 
-/// Checks a project by id without reading the Project aggregate's tables.
+/// The Project aggregate's public interface (its API) for other aggregates:
+/// check a project by id without reading the Project aggregate's tables.
 #[async_trait]
-pub trait ProjectDirectory: Send + Sync {
+pub trait ProjectApi: Send + Sync {
     async fn exists(&self, id: ProjectId) -> RepoResult<bool>;
 }
 
@@ -74,6 +82,6 @@ mod tests {
         fn assert_dyn<T: ?Sized>() {}
         assert_dyn::<dyn ProjectRepository>();
         assert_dyn::<dyn BoardRepository>();
-        assert_dyn::<dyn ProjectDirectory>();
+        assert_dyn::<dyn ProjectApi>();
     }
 }

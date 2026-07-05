@@ -21,11 +21,11 @@ pub struct ProjectResponse {
 impl From<Project> for ProjectResponse {
     fn from(project: Project) -> Self {
         Self {
-            id: project.id.as_uuid(),
-            name: project.name.into_string(),
-            position: project.position.value(),
-            created_at: project.created_at,
-            updated_at: project.updated_at,
+            id: project.id().as_uuid(),
+            name: project.name().as_str().to_owned(),
+            position: project.position().value(),
+            created_at: project.created_at(),
+            updated_at: project.updated_at(),
         }
     }
 }
@@ -60,12 +60,12 @@ pub struct BoardResponse {
 impl From<BoardSummary> for BoardResponse {
     fn from(board: BoardSummary) -> Self {
         Self {
-            id: board.id.as_uuid(),
-            project_id: board.project_id.as_uuid(),
-            name: board.name.into_string(),
-            position: board.position.value(),
-            created_at: board.created_at,
-            updated_at: board.updated_at,
+            id: board.id().as_uuid(),
+            project_id: board.project_id().as_uuid(),
+            name: board.name().as_str().to_owned(),
+            position: board.position().value(),
+            created_at: board.created_at(),
+            updated_at: board.updated_at(),
         }
     }
 }
@@ -94,12 +94,12 @@ pub struct ColumnResponse {
 impl From<Column> for ColumnResponse {
     fn from(column: Column) -> Self {
         Self {
-            id: column.id.as_uuid(),
-            board_id: column.board_id.as_uuid(),
-            name: column.name.into_string(),
-            position: column.position.value(),
-            created_at: column.created_at,
-            updated_at: column.updated_at,
+            id: column.id().as_uuid(),
+            board_id: column.board_id().as_uuid(),
+            name: column.name().as_str().to_owned(),
+            position: column.position().value(),
+            created_at: column.created_at(),
+            updated_at: column.updated_at(),
         }
     }
 }
@@ -129,13 +129,13 @@ pub struct CardResponse {
 impl From<Card> for CardResponse {
     fn from(card: Card) -> Self {
         Self {
-            id: card.id.as_uuid(),
-            column_id: card.column_id.as_uuid(),
-            title: card.title.into_string(),
-            description: card.description.into_string(),
-            position: card.position.value(),
-            created_at: card.created_at,
-            updated_at: card.updated_at,
+            id: card.id().as_uuid(),
+            column_id: card.column_id().as_uuid(),
+            title: card.title().as_str().to_owned(),
+            description: card.description().as_str().to_owned(),
+            position: card.position().value(),
+            created_at: card.created_at(),
+            updated_at: card.updated_at(),
         }
     }
 }
@@ -186,14 +186,14 @@ pub struct ColumnFullResponse {
 impl From<Board> for BoardFullResponse {
     fn from(board: Board) -> Self {
         Self {
-            id: board.id.as_uuid(),
-            project_id: board.project_id.as_uuid(),
-            name: board.name.into_string(),
-            position: board.position.value(),
-            created_at: board.created_at,
-            updated_at: board.updated_at,
+            id: board.id().as_uuid(),
+            project_id: board.project_id().as_uuid(),
+            name: board.name().as_str().to_owned(),
+            position: board.position().value(),
+            created_at: board.created_at(),
+            updated_at: board.updated_at(),
             columns: board
-                .columns
+                .into_columns()
                 .into_iter()
                 .map(ColumnFullResponse::from)
                 .collect(),
@@ -204,13 +204,17 @@ impl From<Board> for BoardFullResponse {
 impl From<Column> for ColumnFullResponse {
     fn from(column: Column) -> Self {
         Self {
-            id: column.id.as_uuid(),
-            board_id: column.board_id.as_uuid(),
-            name: column.name.into_string(),
-            position: column.position.value(),
-            created_at: column.created_at,
-            updated_at: column.updated_at,
-            cards: column.cards.into_iter().map(CardResponse::from).collect(),
+            id: column.id().as_uuid(),
+            board_id: column.board_id().as_uuid(),
+            name: column.name().as_str().to_owned(),
+            position: column.position().value(),
+            created_at: column.created_at(),
+            updated_at: column.updated_at(),
+            cards: column
+                .into_cards()
+                .into_iter()
+                .map(CardResponse::from)
+                .collect(),
         }
     }
 }

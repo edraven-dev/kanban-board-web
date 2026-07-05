@@ -35,10 +35,10 @@ db_test! {
         let p = project("Roadmap", 0);
         repo.insert(&p).await.unwrap();
 
-        let fetched = repo.get(p.id).await.unwrap().unwrap();
-        assert_eq!(fetched.id, p.id);
-        assert_eq!(fetched.name.as_str(), "Roadmap");
-        assert_eq!(fetched.position.value(), 0);
+        let fetched = repo.get(p.id()).await.unwrap().unwrap();
+        assert_eq!(fetched.id(), p.id());
+        assert_eq!(fetched.name().as_str(), "Roadmap");
+        assert_eq!(fetched.position().value(), 0);
     }
 }
 
@@ -60,7 +60,7 @@ db_test! {
             .await
             .unwrap()
             .iter()
-            .map(|p| p.name.as_str().to_owned())
+            .map(|p| p.name().as_str().to_owned())
             .collect();
         assert_eq!(names, ["B", "C", "A"]);
     }
@@ -71,8 +71,8 @@ db_test! {
         let repo = PgProjectRepo::new(pool);
         let p = project("Old", 0);
         repo.insert(&p).await.unwrap();
-        repo.update(p.id, EntityName::new("New").unwrap()).await.unwrap();
-        assert_eq!(repo.get(p.id).await.unwrap().unwrap().name.as_str(), "New");
+        repo.update(p.id(), EntityName::new("New").unwrap()).await.unwrap();
+        assert_eq!(repo.get(p.id()).await.unwrap().unwrap().name().as_str(), "New");
     }
 }
 
@@ -81,8 +81,8 @@ db_test! {
         let repo = PgProjectRepo::new(pool);
         let p = project("Gone", 0);
         repo.insert(&p).await.unwrap();
-        repo.delete(p.id).await.unwrap();
-        assert!(repo.get(p.id).await.unwrap().is_none());
+        repo.delete(p.id()).await.unwrap();
+        assert!(repo.get(p.id()).await.unwrap().is_none());
     }
 }
 
@@ -93,10 +93,10 @@ db_test! {
         for p in [&a, &b, &c] {
             repo.insert(p).await.unwrap();
         }
-        repo.reorder(&[c.id, a.id, b.id]).await.unwrap();
+        repo.reorder(&[c.id(), a.id(), b.id()]).await.unwrap();
 
-        let ordered: Vec<ProjectId> = repo.list().await.unwrap().iter().map(|p| p.id).collect();
-        assert_eq!(ordered, [c.id, a.id, b.id]);
+        let ordered: Vec<ProjectId> = repo.list().await.unwrap().iter().map(|p| p.id()).collect();
+        assert_eq!(ordered, [c.id(), a.id(), b.id()]);
     }
 }
 

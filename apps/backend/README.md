@@ -58,9 +58,9 @@ transaction** (`save`) — generalizing the board-full read model to the write s
 **Aggregate boundaries are non-negotiable** (see the root `CLAUDE.md`): a repository's
 SQL may touch **only its own aggregate's tables**. `PgBoardRepo` never reads `projects`;
 when the Board aggregate needs to know a project exists (creating a board), it asks the
-`ProjectDirectory` **system service** — the Project aggregate's public interface — rather
-than querying the `projects` table. In this monolith the directory is backed by the
-Project repository; across a service split it would be an API call. The
+`ProjectApi` **port** (the Project aggregate's public interface) — rather than querying
+the `projects` table. In this monolith that port is implemented by `ProjectApiGateway`,
+backed by the Project repository; across a service split it would be an API call. The
 `boards.project_id → projects.id` foreign key is kept only as a database safety net, not
 as a licence to read across the boundary.
 

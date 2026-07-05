@@ -29,7 +29,7 @@ impl ProjectService {
             .list()
             .await?
             .iter()
-            .map(|p| p.position.value())
+            .map(|p| p.position().value())
             .max()
             .map_or(0, |max| max + 1);
         let project = Project::new(name, Position::new(next)?);
@@ -60,7 +60,7 @@ impl ProjectService {
             .list()
             .await?
             .into_iter()
-            .map(|p| p.id)
+            .map(|p| p.id())
             .collect();
         ensure_permutation(&existing, &ordered_ids)?;
         self.projects.reorder(&ordered_ids).await?;
@@ -112,7 +112,7 @@ mod tests {
                 return Err(RepositoryError::new("boom"));
             }
             let mut rows = self.rows.lock().unwrap().clone();
-            rows.sort_by_key(|p| p.position.value());
+            rows.sort_by_key(|p| p.position().value());
             Ok(rows)
         }
 
@@ -122,7 +122,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .find(|p| p.id == id)
+                .find(|p| p.id() == id)
                 .cloned())
         }
 
@@ -132,22 +132,22 @@ mod tests {
         }
 
         async fn update(&self, id: ProjectId, name: EntityName) -> RepoResult<()> {
-            if let Some(p) = self.rows.lock().unwrap().iter_mut().find(|p| p.id == id) {
-                p.name = name;
+            if let Some(p) = self.rows.lock().unwrap().iter_mut().find(|p| p.id() == id) {
+                p.rename(name);
             }
             Ok(())
         }
 
         async fn delete(&self, id: ProjectId) -> RepoResult<()> {
-            self.rows.lock().unwrap().retain(|p| p.id != id);
+            self.rows.lock().unwrap().retain(|p| p.id() != id);
             Ok(())
         }
 
         async fn reorder(&self, ordered_ids: &[ProjectId]) -> RepoResult<()> {
             let mut rows = self.rows.lock().unwrap();
             for (index, id) in ordered_ids.iter().enumerate() {
-                if let Some(p) = rows.iter_mut().find(|p| p.id == *id) {
-                    p.position = Position::new(index as i32).unwrap();
+                if let Some(p) = rows.iter_mut().find(|p| p.id() == *id) {
+                    p.reposition(Position::new(index as i32).unwrap());
                 }
             }
             Ok(())
@@ -161,8 +161,8 @@ mod tests {
 
         let created = service.create("  Roadmap  ").await.unwrap();
 
-        assert_eq!(created.name.as_str(), "Roadmap");
-        assert_eq!(created.position.value(), 2);
+        assert_eq!(created.name().as_str(), "Roadmap");
+        assert_eq!(created.position().value(), 2);
         assert_eq!(service.list().await.unwrap().len(), 3);
     }
 
@@ -170,7 +170,7 @@ mod tests {
     async fn create_of_the_first_project_starts_at_zero() {
         let service = ProjectService::new(FakeProjectRepo::with(vec![]));
         let created = service.create("First").await.unwrap();
-        assert_eq!(created.position.value(), 0);
+        assert_eq!(created.position().value(), 0);
     }
 
     #[tokio::test]
@@ -193,11 +193,11 @@ mod tests {
     #[tokio::test]
     async fn update_changes_an_existing_project() {
         let existing = project("Old", 0);
-        let id = existing.id;
+        let id = existing.id();
         let service = ProjectService::new(FakeProjectRepo::with(vec![existing]));
 
         let updated = service.update(id, "New").await.unwrap();
-        assert_eq!(updated.name.as_str(), "New");
+        assert_eq!(updated.name().as_str(), "New");
     }
 
     #[tokio::test]
@@ -210,7 +210,7 @@ mod tests {
     #[tokio::test]
     async fn update_rejects_a_blank_name() {
         let existing = project("Old", 0);
-        let id = existing.id;
+        let id = existing.id();
         let service = ProjectService::new(FakeProjectRepo::with(vec![existing]));
         let err = service.update(id, "").await.unwrap_err();
         assert!(matches!(
@@ -222,7 +222,7 @@ mod tests {
     #[tokio::test]
     async fn delete_removes_an_existing_project() {
         let existing = project("Gone", 0);
-        let id = existing.id;
+        let id = existing.id();
         let service = ProjectService::new(FakeProjectRepo::with(vec![existing]));
 
         service.delete(id).await.unwrap();
@@ -241,12 +241,18 @@ mod tests {
         let a = project("A", 0);
         let b = project("B", 1);
         let c = project("C", 2);
-        let (ia, ib, ic) = (a.id, b.id, c.id);
+        let (ia, ib, ic) = (a.id(), b.id(), c.id());
         let service = ProjectService::new(FakeProjectRepo::with(vec![a, b, c]));
 
         service.reorder(vec![ic, ia, ib]).await.unwrap();
 
-        let ordered: Vec<ProjectId> = service.list().await.unwrap().iter().map(|p| p.id).collect();
+        let ordered: Vec<ProjectId> = service
+            .list()
+            .await
+            .unwrap()
+            .iter()
+            .map(|p| p.id())
+            .collect();
         assert_eq!(ordered, vec![ic, ia, ib]);
     }
 
@@ -254,7 +260,7 @@ mod tests {
     async fn reorder_rejects_a_non_permutation() {
         let a = project("A", 0);
         let b = project("B", 1);
-        let ia = a.id;
+        let ia = a.id();
         let service = ProjectService::new(FakeProjectRepo::with(vec![a, b]));
 
         let err = service
@@ -268,7 +274,7 @@ mod tests {
     async fn reorder_rejects_duplicate_ids() {
         let a = project("A", 0);
         let b = project("B", 1);
-        let (ia, ib) = (a.id, b.id);
+        let (ia, ib) = (a.id(), b.id());
         let service = ProjectService::new(FakeProjectRepo::with(vec![a, b]));
 
         let err = service.reorder(vec![ia, ia, ib]).await.unwrap_err();
