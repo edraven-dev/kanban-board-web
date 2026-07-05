@@ -6,5 +6,6 @@ minimumReleaseAge: 0
 
 allowBuilds:
   msw: false
+  playwright: false
   sharp: false
   unrs-resolver: false
