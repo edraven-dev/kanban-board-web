@@ -55,6 +55,9 @@ jobs:
 
   coverage:
     executor: turbo
+    # Coverage runs the full test suite (incl. backend testcontainers) plus
+    # instrumentation, so give this job more headroom than the medium default.
+    resource_class: large
     steps:
       - setup
       - run:

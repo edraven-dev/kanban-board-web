@@ -55,6 +55,10 @@ describe("ProjectBoards", () => {
       "href",
       `/boards/${b2}`,
     );
+    // Each tile exposes a keyboard-accessible reorder handle.
+    expect(
+      screen.getByRole("button", { name: "Reorder Sprint 1" }),
+    ).toBeInTheDocument();
   });
 
   it("shows the empty state", async () => {
